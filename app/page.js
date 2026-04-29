@@ -108,6 +108,27 @@ function getWorstStatus(client) {
   return worst;
 }
 
+/** 利用者が持つ全ステータスをセットで返す */
+function getClientStatuses(client) {
+  const statuses = new Set();
+  for (const dt of DEADLINE_TYPES) {
+    const days = getDaysUntil(client[dt.key]);
+    const s = getStatus(days);
+    if (s !== null) statuses.add(s);
+  }
+  return statuses;
+}
+
+/** 利用者がフィルタに該当するか（期限のどれか1つでも該当すればtrue） */
+function clientMatchesFilter(client, filter) {
+  const statuses = getClientStatuses(client);
+  if (statuses.size === 0) return false;
+  if (filter === 'attention') {
+    return statuses.has('expired') || statuses.has('warning') || statuses.has('caution');
+  }
+  return statuses.has(filter);
+}
+
 function getVisibleCalendarKeys(client) {
   const nintei = normalizeClientDate(client.nintei_end);
   const long = normalizeClientDate(client.long_end);
@@ -117,11 +138,6 @@ function getVisibleCalendarKeys(client) {
   if (long && !(nintei && nintei === long)) keys.push('long_end');
   if (short && !(nintei && nintei === short) && !(long && long === short)) keys.push('short_end');
   return keys;
-}
-
-function matchesFilter(status, filter) {
-  if (filter === 'attention') return status !== null && status !== 'safe';
-  return status === filter;
 }
 
 function DaysBadge({ days }) {
@@ -386,31 +402,24 @@ export default function KigenKanri() {
     return list;
   }, [clients, managerFilter]);
 
-  const allDeadlines = useMemo(() => {
-    return filteredClients.flatMap(client =>
-      DEADLINE_TYPES.map(dt => ({
-        clientId: client.id, clientName: client.name,
-        typeKey: dt.key, date: client[dt.key],
-        days: getDaysUntil(client[dt.key]),
-        status: getStatus(getDaysUntil(client[dt.key])),
-      }))
-    );
-  }, [filteredClients]);
-
+  // 利用者単位でカウント（期限のどれか1つでも該当すればカウント）
   const summary = useMemo(() => {
-    const counts = { expired: 0, warning: 0, caution: 0, safe: 0, unset: 0 };
-    allDeadlines.forEach(d => { if (d.status === null) counts.unset++; else counts[d.status]++; });
-    counts.attention = counts.expired + counts.warning + counts.caution;
+    const counts = { expired: 0, warning: 0, caution: 0, safe: 0, attention: 0 };
+    filteredClients.forEach(client => {
+      const statuses = getClientStatuses(client);
+      if (statuses.has('expired')) counts.expired++;
+      if (statuses.has('warning')) counts.warning++;
+      if (statuses.has('caution')) counts.caution++;
+      if (statuses.has('safe')) counts.safe++;
+      if (statuses.has('expired') || statuses.has('warning') || statuses.has('caution')) counts.attention++;
+    });
     return counts;
-  }, [allDeadlines]);
+  }, [filteredClients]);
 
   const filteredSortedClients = useMemo(() => {
     const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
     let list = filteredClients.map(client => ({ ...client, worstStatus: getWorstStatus(client) }));
-    list = list.filter(c => {
-      if (c.worstStatus === null) return activeFilter === 'attention';
-      return matchesFilter(c.worstStatus, activeFilter);
-    });
+    list = list.filter(c => clientMatchesFilter(c, activeFilter));
     list.sort((a, b) => {
       const ap = a.worstStatus === null ? 99 : (priority[a.worstStatus] ?? 5);
       const bp = b.worstStatus === null ? 99 : (priority[b.worstStatus] ?? 5);
@@ -496,8 +505,8 @@ export default function KigenKanri() {
           border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '24px' }}>⚠️</span>
           <div>
-            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626' }}>要対応: {summary.expired + summary.warning}件</p>
-            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>期限切れ {summary.expired}件 ・ 30日以内 {summary.warning}件</p>
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626' }}>要対応: {summary.expired + summary.warning}名</p>
+            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p>
           </div>
         </div>
       )}
