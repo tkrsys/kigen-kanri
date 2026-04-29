@@ -11,10 +11,7 @@
     "next": "^15.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "better-sqlite3": "^11.9.1",
+    "@neondatabase/serverless": "^0.10.4",
     "googleapis": "^148.0.0"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.14"
   }
 }
