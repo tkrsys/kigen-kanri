@@ -1,9 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
-// ============================================================
-// 定数
-// ============================================================
 const STATUS_CONFIG = {
   expired:  { label: '期限切', color: '#DC2626', bg: '#FEF2F2' },
   warning:  { label: '30日以内', color: '#EA580C', bg: '#FFF7ED' },
@@ -23,9 +20,6 @@ const CAL_CONFIG = {
   short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', dayAction: '意見照会＋ﾌﾟﾗﾝ交付' },
 };
 
-// ============================================================
-// ユーティリティ
-// ============================================================
 function getDaysUntil(dateStr) {
   if (!dateStr) return null;
   const today = new Date();
@@ -76,22 +70,31 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   const preDate = getPreNoticeDate(normalized);
   const preDateObj = new Date(preDate + 'T00:00:00');
   const preDateLabel = `${preDateObj.getMonth() + 1}/${preDateObj.getDate()}`;
-
   return {
-    pre: {
-      date: preDateLabel,
-      title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${actionMonth}月 ${config.preAction})`,
-    },
-    day: {
-      date: `${mm}/${dd}`,
-      title: `【${config.label}】${userName} ${config.dayAction}`,
-    },
+    pre: { date: preDateLabel, title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${actionMonth}月 ${config.preAction})` },
+    day: { date: `${mm}/${dd}`, title: `【${config.label}】${userName} ${config.dayAction}` },
   };
 }
 
-// ============================================================
-// DaysBadge
-// ============================================================
+// 利用者の最悪ステータスを取得
+function getWorstStatus(client) {
+  const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
+  let worst = null;
+  for (const dt of DEADLINE_TYPES) {
+    const days = getDaysUntil(client[dt.key]);
+    const s = getStatus(days);
+    if (s === null) continue;
+    if (worst === null || priority[s] < priority[worst]) worst = s;
+  }
+  return worst;
+}
+
+// フィルタ条件にステータスが合うか
+function matchesFilter(status, filter) {
+  if (filter === 'attention') return status !== null && status !== 'safe';
+  return status === filter;
+}
+
 function DaysBadge({ days }) {
   if (days === null) return (
     <span style={{ fontSize: '12px', color: '#94A3B8', padding: '2px 10px',
@@ -109,13 +112,9 @@ function DaysBadge({ days }) {
   );
 }
 
-// ============================================================
-// CalendarPreview
-// ============================================================
 function CalendarPreview({ typeKey, userName, dateStr }) {
   const titles = buildCalendarTitles(typeKey, userName, dateStr);
   if (!titles) return null;
-
   return (
     <div style={{ marginTop: '6px', padding: '8px 10px', background: '#FFFBEB',
       borderRadius: '8px', border: '1px solid #FDE68A' }}>
@@ -125,14 +124,12 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
       <div style={{ fontSize: '11px', color: '#78350F', lineHeight: 1.6 }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
-            borderRadius: '4px', background: '#FEF3C7', color: '#92400E',
-            fontWeight: 600 }}>{titles.pre.date}</span>
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.pre.date}</span>
           <span style={{ wordBreak: 'break-all' }}>{titles.pre.title}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '3px' }}>
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
-            borderRadius: '4px', background: '#FEF3C7', color: '#92400E',
-            fontWeight: 600 }}>{titles.day.date}</span>
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.day.date}</span>
           <span style={{ wordBreak: 'break-all' }}>{titles.day.title}</span>
         </div>
       </div>
@@ -140,31 +137,19 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
   );
 }
 
-// ============================================================
-// PIN認証画面
-// ============================================================
 function PinScreen({ onAuth }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   const handleSubmit = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await fetch('/api/clients', { headers: { 'x-pin': pin } });
-      if (res.ok) {
-        localStorage.setItem('kigen-pin', pin);
-        onAuth(pin);
-      } else {
-        setError('PINが正しくありません');
-      }
-    } catch {
-      setError('接続エラー');
-    }
+      if (res.ok) { localStorage.setItem('kigen-pin', pin); onAuth(pin); }
+      else setError('PINが正しくありません');
+    } catch { setError('接続エラー'); }
     setLoading(false);
   };
-
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center',
       minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif", padding: '20px' }}>
@@ -191,9 +176,6 @@ function PinScreen({ onAuth }) {
   );
 }
 
-// ============================================================
-// 期限入力モーダル
-// ============================================================
 function DeadlineForm({ client, onSave, onClose, pin }) {
   const [form, setForm] = useState({
     nintei_end: toInputDate(client.nintei_end),
@@ -202,76 +184,46 @@ function DeadlineForm({ client, onSave, onClose, pin }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
   const handleSave = async () => {
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
       const res = await fetch(`/api/clients/${client.id}/deadlines`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-pin': pin },
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-pin': pin },
         body: JSON.stringify(form),
       });
-      if (res.ok) {
-        const data = await res.json();
-        onSave(data.client);
-      } else {
-        const data = await res.json();
-        setError(data.error || '保存に失敗しました');
-      }
-    } catch {
-      setError('接続エラー');
-    }
+      if (res.ok) { const data = await res.json(); onSave(data.client); }
+      else { const data = await res.json(); setError(data.error || '保存に失敗しました'); }
+    } catch { setError('接続エラー'); }
     setSaving(false);
   };
-
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100,
       fontFamily: "'Noto Sans JP', sans-serif" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff',
-        borderRadius: '20px 20px 0 0', padding: '24px 20px 32px',
-        maxHeight: '85vh', overflow: 'auto' }}>
+        borderRadius: '20px 20px 0 0', padding: '24px 20px 32px', maxHeight: '85vh', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>期限設定</h2>
             <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748B' }}>{client.name}</p>
-            {client.care_manager && (
-              <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94A3B8' }}>担当: {client.care_manager}</p>
-            )}
+            {client.care_manager && <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94A3B8' }}>担当: {client.care_manager}</p>}
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none',
-            fontSize: '20px', color: '#94A3B8', cursor: 'pointer', padding: '8px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94A3B8', cursor: 'pointer', padding: '8px' }}>✕</button>
         </div>
-
         {DEADLINE_TYPES.map(dt => (
           <div key={dt.key} style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600,
-              color: '#334155', marginBottom: '6px' }}>{dt.label}</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>{dt.label}</label>
             <input type="date" value={form[dt.key]}
               onChange={e => setForm({ ...form, [dt.key]: e.target.value })}
-              style={{ width: '100%', padding: '12px', fontSize: '15px',
-                border: '1.5px solid #E2E8F0', borderRadius: '10px', outline: 'none',
-                boxSizing: 'border-box', color: '#1E293B' }} />
-            {form[dt.key] && (
-              <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />
-            )}
+              style={{ width: '100%', padding: '12px', fontSize: '15px', border: '1.5px solid #E2E8F0', borderRadius: '10px', outline: 'none', boxSizing: 'border-box', color: '#1E293B' }} />
+            {form[dt.key] && <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />}
           </div>
         ))}
-
         {error && <p style={{ color: '#DC2626', fontSize: '13px', margin: '8px 0' }}>{error}</p>}
-
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '14px', fontSize: '14px', fontWeight: 600,
-              background: '#F1F5F9', color: '#475569', border: 'none',
-              borderRadius: '12px', cursor: 'pointer' }}>キャンセル</button>
-          <button onClick={handleSave} disabled={saving}
-            style={{ flex: 1, padding: '14px', fontSize: '14px', fontWeight: 600,
-              background: 'linear-gradient(135deg, #1E3A5F, #2D5A87)', color: '#fff',
-              border: 'none', borderRadius: '12px', cursor: 'pointer',
-              opacity: saving ? 0.5 : 1 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '14px', fontSize: '14px', fontWeight: 600, background: '#F1F5F9', color: '#475569', border: 'none', borderRadius: '12px', cursor: 'pointer' }}>キャンセル</button>
+          <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '14px', fontSize: '14px', fontWeight: 600, background: 'linear-gradient(135deg, #1E3A5F, #2D5A87)', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
             {saving ? '保存中...' : '保存'}
           </button>
         </div>
@@ -280,9 +232,6 @@ function DeadlineForm({ client, onSave, onClose, pin }) {
   );
 }
 
-// ============================================================
-// メインアプリ
-// ============================================================
 export default function KigenKanri() {
   const [pin, setPin] = useState(null);
   const [clients, setClients] = useState([]);
@@ -295,30 +244,20 @@ export default function KigenKanri() {
 
   useEffect(() => {
     const saved = localStorage.getItem('kigen-pin');
-    if (saved) setPin(saved);
-    else setLoading(false);
+    if (saved) setPin(saved); else setLoading(false);
   }, []);
 
   const fetchClients = useCallback(async (p) => {
     setLoading(true);
     try {
       const res = await fetch('/api/clients', { headers: { 'x-pin': p } });
-      if (res.ok) {
-        const data = await res.json();
-        setClients(data.clients || []);
-      } else if (res.status === 401) {
-        localStorage.removeItem('kigen-pin');
-        setPin(null);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+      if (res.ok) { const data = await res.json(); setClients(data.clients || []); }
+      else if (res.status === 401) { localStorage.removeItem('kigen-pin'); setPin(null); }
+    } catch (e) { console.error(e); }
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    if (pin) fetchClients(pin);
-  }, [pin, fetchClients]);
+  useEffect(() => { if (pin) fetchClients(pin); }, [pin, fetchClients]);
 
   const managers = useMemo(() => {
     const set = new Set(clients.map(c => c.care_manager).filter(Boolean));
@@ -327,23 +266,16 @@ export default function KigenKanri() {
 
   const filteredClients = useMemo(() => {
     let list = clients;
-    if (managerFilter !== 'all') {
-      list = list.filter(c => c.care_manager === managerFilter);
-    }
+    if (managerFilter !== 'all') list = list.filter(c => c.care_manager === managerFilter);
     return list;
   }, [clients, managerFilter]);
 
   const allDeadlines = useMemo(() => {
     return filteredClients.flatMap(client =>
       DEADLINE_TYPES.map(dt => ({
-        clientId: client.id,
-        clientName: client.name,
-        careManager: client.care_manager,
-        typeKey: dt.key,
-        typeLabel: dt.label,
-        typeShort: dt.short,
-        date: client[dt.key],
-        days: getDaysUntil(client[dt.key]),
+        clientId: client.id, clientName: client.name, careManager: client.care_manager,
+        typeKey: dt.key, typeLabel: dt.label, typeShort: dt.short,
+        date: client[dt.key], days: getDaysUntil(client[dt.key]),
         status: getStatus(getDaysUntil(client[dt.key])),
       }))
     );
@@ -351,65 +283,55 @@ export default function KigenKanri() {
 
   const summary = useMemo(() => {
     const counts = { expired: 0, warning: 0, caution: 0, safe: 0, unset: 0 };
-    allDeadlines.forEach(d => {
-      if (d.status === null) counts.unset++;
-      else counts[d.status]++;
-    });
+    allDeadlines.forEach(d => { if (d.status === null) counts.unset++; else counts[d.status]++; });
     counts.attention = counts.expired + counts.warning + counts.caution;
     return counts;
   }, [allDeadlines]);
 
+  // ダッシュボード用: 期限単位でフィルタ
   const filteredDeadlines = useMemo(() => {
     let items = allDeadlines.filter(d => d.days !== null);
-    if (activeFilter === 'attention') {
-      // 余裕以外 = 期限切 + 30日以内 + 75日以内
-      items = items.filter(d => d.status !== 'safe');
-    } else if (activeFilter !== 'all') {
-      items = items.filter(d => d.status === activeFilter);
-    }
+    if (activeFilter === 'attention') items = items.filter(d => d.status !== 'safe');
+    else items = items.filter(d => d.status === activeFilter);
     return items.sort((a, b) => a.days - b.days);
   }, [allDeadlines, activeFilter]);
 
-  const sortedClients = useMemo(() => {
+  // 利用者別用: 利用者の最悪ステータスでフィルタ＋ソート
+  const filteredSortedClients = useMemo(() => {
     const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
-    return [...filteredClients].sort((a, b) => {
-      const aWorst = Math.min(...DEADLINE_TYPES.map(dt => {
-        const days = getDaysUntil(a[dt.key]);
-        const s = getStatus(days);
-        return s === null ? 99 : (priority[s] ?? 5);
-      }));
-      const bWorst = Math.min(...DEADLINE_TYPES.map(dt => {
-        const days = getDaysUntil(b[dt.key]);
-        const s = getStatus(days);
-        return s === null ? 99 : (priority[s] ?? 5);
-      }));
-      return aWorst - bWorst;
+    let list = filteredClients.map(client => ({
+      ...client,
+      worstStatus: getWorstStatus(client),
+    }));
+    // フィルタ適用: 利用者の最悪ステータスがフィルタ条件に合うか
+    list = list.filter(c => {
+      if (c.worstStatus === null) return activeFilter === 'attention'; // 未設定は要注意に含める
+      return matchesFilter(c.worstStatus, activeFilter);
     });
-  }, [filteredClients]);
+    // 緊急度順ソート
+    list.sort((a, b) => {
+      const ap = a.worstStatus === null ? 99 : (priority[a.worstStatus] ?? 5);
+      const bp = b.worstStatus === null ? 99 : (priority[b.worstStatus] ?? 5);
+      return ap - bp;
+    });
+    return list;
+  }, [filteredClients, activeFilter]);
 
   const handleSave = (updatedClient) => {
     setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
     setEditClient(null);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('kigen-pin');
-    setPin(null);
-    setClients([]);
-  };
+  const handleLogout = () => { localStorage.removeItem('kigen-pin'); setPin(null); setClients([]); };
 
   if (!pin) return <PinScreen onAuth={p => setPin(p)} />;
-
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center',
-      minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif", color: '#64748B' }}>
-      読み込み中...
-    </div>
+      minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif", color: '#64748B' }}>読み込み中...</div>
   );
 
   const FILTER_ITEMS = [
     { key: 'attention', label: '要注意', count: summary.attention, color: '#B45309' },
-    { key: 'all', label: '全て', count: allDeadlines.filter(d => d.days !== null).length, color: '#1E3A5F' },
     { key: 'expired', label: '期限切', color: STATUS_CONFIG.expired.color, count: summary.expired },
     { key: 'warning', label: '30日以内', color: STATUS_CONFIG.warning.color, count: summary.warning },
     { key: 'caution', label: '75日以内', color: STATUS_CONFIG.caution.color, count: summary.caution },
@@ -420,43 +342,29 @@ export default function KigenKanri() {
     <div style={{ fontFamily: "'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif",
       maxWidth: '480px', margin: '0 auto', backgroundColor: '#F8FAFC', minHeight: '100vh', color: '#1E293B' }}>
 
-      <div style={{ background: 'linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%)',
-        padding: '20px 16px 16px', color: '#fff' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%)', padding: '20px 16px 16px', color: '#fff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '0.5px' }}>期限管理</h1>
             <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.8 }}>
-              {new Date().getFullYear()}年{new Date().getMonth() + 1}月{new Date().getDate()}日 現在
-              ・{clients.length}名
+              {new Date().getFullYear()}年{new Date().getMonth() + 1}月{new Date().getDate()}日 現在・{clients.length}名
             </p>
           </div>
-          <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)',
-            border: 'none', color: '#fff', fontSize: '12px', padding: '6px 12px',
-            borderRadius: '8px', cursor: 'pointer' }}>ログアウト</button>
+          <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '12px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>ログアウト</button>
         </div>
-
         {managers.length > 1 && (
           <div style={{ marginTop: '12px' }}>
             <select value={managerFilter} onChange={e => setManagerFilter(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', fontSize: '13px',
-                borderRadius: '8px', border: 'none', background: 'rgba(255,255,255,0.15)',
-                color: '#fff', outline: 'none', appearance: 'auto' }}>
+              style={{ width: '100%', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', outline: 'none', appearance: 'auto' }}>
               <option value="all" style={{ color: '#1E293B' }}>全ケアマネ</option>
-              {managers.map(m => (
-                <option key={m} value={m} style={{ color: '#1E293B' }}>{m}</option>
-              ))}
+              {managers.map(m => <option key={m} value={m} style={{ color: '#1E293B' }}>{m}</option>)}
             </select>
           </div>
         )}
-
         <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }}>
-          {[
-            { key: 'dashboard', label: 'ダッシュボード' },
-            { key: 'clients', label: '利用者別' },
-          ].map(tab => (
+          {[{ key: 'dashboard', label: 'ダッシュボード' }, { key: 'clients', label: '利用者別' }].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              flex: 1, padding: '8px', border: 'none', borderRadius: '8px',
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              flex: 1, padding: '8px', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
               background: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : 'transparent',
               color: activeTab === tab.key ? '#fff' : 'rgba(255,255,255,0.6)',
             }}>{tab.label}</button>
@@ -472,9 +380,7 @@ export default function KigenKanri() {
             background: activeFilter === item.key ? (item.color || '#1E3A5F') : '#fff',
             color: activeFilter === item.key ? '#fff' : (item.color || '#64748B'),
             boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          }}>
-            {item.label} ({item.count})
-          </button>
+          }}>{item.label} ({item.count})</button>
         ))}
       </div>
 
@@ -484,12 +390,8 @@ export default function KigenKanri() {
           border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '24px' }}>⚠️</span>
           <div>
-            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626' }}>
-              要対応: {summary.expired + summary.warning}件
-            </p>
-            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>
-              期限切 {summary.expired}件 ・ 30日以内 {summary.warning}件
-            </p>
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626' }}>要対応: {summary.expired + summary.warning}件</p>
+            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>期限切 {summary.expired}件 ・ 30日以内 {summary.warning}件</p>
           </div>
         </div>
       )}
@@ -512,13 +414,10 @@ export default function KigenKanri() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                       <span style={{ fontSize: '14px', fontWeight: 700 }}>{d.clientName}</span>
-                      <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px',
-                        background: '#F1F5F9', color: '#475569', fontWeight: 600 }}>{d.typeShort}</span>
+                      <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: '#F1F5F9', color: '#475569', fontWeight: 600 }}>{d.typeShort}</span>
                     </div>
                     <span style={{ fontSize: '12px', color: '#64748B' }}>{formatDate(d.date)}</span>
-                    {d.careManager && (
-                      <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{d.careManager}</span>
-                    )}
+                    {d.careManager && <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{d.careManager}</span>}
                   </div>
                   <DaysBadge days={d.days} />
                 </div>
@@ -526,29 +425,22 @@ export default function KigenKanri() {
             })}
             {filteredDeadlines.length === 0 && (
               <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '14px', marginTop: '40px' }}>
-                {activeFilter === 'attention' ? '要注意の期限はありません' :
-                 activeFilter === 'all' ? '期限データがありません。利用者別タブで期限を設定してください。' :
-                 '該当する期限はありません'}
+                {activeFilter === 'attention' ? '要注意の期限はありません' : '該当する期限はありません'}
               </p>
             )}
           </>
         ) : (
           <>
             <p style={{ fontSize: '11px', color: '#94A3B8', margin: '8px 0', fontWeight: 500 }}>
-              {sortedClients.length}名 — 緊急度順
+              {filteredSortedClients.length}名 — 緊急度順
             </p>
-            {sortedClients.map(client => {
+            {filteredSortedClients.map(client => {
               const deadlines = DEADLINE_TYPES.map(dt => ({
                 ...dt, date: client[dt.key],
                 days: getDaysUntil(client[dt.key]),
                 status: getStatus(getDaysUntil(client[dt.key])),
               }));
-              const worstStatus = deadlines.reduce((w, d) => {
-                if (d.status === null) return w;
-                const p = { expired: 0, warning: 1, caution: 2, safe: 3 };
-                return (w === null || p[d.status] < p[w]) ? d.status : w;
-              }, null);
-              const worstInfo = worstStatus ? STATUS_CONFIG[worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
+              const worstInfo = client.worstStatus ? STATUS_CONFIG[client.worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
               const isExpanded = expandedClient === client.id;
 
               return (
@@ -565,15 +457,11 @@ export default function KigenKanri() {
                           background: worstInfo.bg, color: worstInfo.color, fontWeight: 600,
                           border: `1px solid ${worstInfo.color}22` }}>{worstInfo.label}</span>
                       </div>
-                      {client.care_manager && (
-                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' }}>担当: {client.care_manager}</p>
-                      )}
+                      {client.care_manager && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' }}>担当: {client.care_manager}</p>}
                     </div>
                     <span style={{ fontSize: '16px', color: '#94A3B8',
-                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s' }}>▼</span>
+                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                   </div>
-
                   {isExpanded && (
                     <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1F5F9' }}>
                       {deadlines.map(dl => (
@@ -597,13 +485,14 @@ export default function KigenKanri() {
                 </div>
               );
             })}
+            {filteredSortedClients.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '14px', marginTop: '40px' }}>該当する利用者はいません</p>
+            )}
           </>
         )}
       </div>
 
-      {editClient && (
-        <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} />
-      )}
+      {editClient && <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} />}
     </div>
   );
 }
