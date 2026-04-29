@@ -80,11 +80,15 @@ function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
     {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);}
 
 function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,isAdmin}){
-  const[name,setName]=useState('');const[careManager,setCareManager]=useState(managerList[0]||'');
+  const savedCM=typeof window!=='undefined'?localStorage.getItem('kigen-reg-cm')||'':'';
+  const initialCM=managerList.includes(savedCM)?savedCM:(managerList[0]||'');
+  const[name,setName]=useState('');const[careManager,setCareManager]=useState(initialCM);
   const[ninteiEnd,setNinteiEnd]=useState('');const[longEnd,setLongEnd]=useState('');const[shortEnd,setShortEnd]=useState('');
   const[saving,setSaving]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
 
-  useEffect(()=>{if(managerList.length>0&&!careManager)setCareManager(managerList[0]);},[managerList,careManager]);
+  useEffect(()=>{if(managerList.length>0&&!careManager){const s=localStorage.getItem('kigen-reg-cm')||'';const v=managerList.includes(s)?s:managerList[0];setCareManager(v);}},[managerList,careManager]);
+
+  const handleCMChange=(v)=>{setCareManager(v);setError('');setSuccess('');try{localStorage.setItem('kigen-reg-cm',v);}catch{}};
 
   const handleSubmit=async()=>{
     if(!name.trim()){setError('利用者名を入力してください');return;}
@@ -139,7 +143,7 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
 
           <div style={{marginBottom:16}}>
             <label style={labelStyle}>担当ケアマネジャー <span style={{color:'#c0392b'}}>*</span></label>
-            <select value={careManager} onChange={e=>{setCareManager(e.target.value);setError('');setSuccess('');}} style={{...inputStyle,appearance:'auto'}}>
+            <select value={careManager} onChange={e=>handleCMChange(e.target.value)} style={{...inputStyle,appearance:'auto'}}>
               {managerList.map(m=><option key={m} value={m}>{m}</option>)}
             </select>
           </div>
