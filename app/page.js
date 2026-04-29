@@ -59,10 +59,11 @@ function toInputDate(dateStr) {
 }
 
 // カレンダー予定タイトル生成（フロントエンド用）
+// 前々月25日 = getMonth() - 2
 function getPreNoticeDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   let year = d.getFullYear();
-  let month = d.getMonth() - 1;
+  let month = d.getMonth() - 2; // 前々月
   if (month < 0) { month += 12; year -= 1; }
   return `${year}-${String(month + 1).padStart(2, '0')}-25`;
 }
@@ -75,6 +76,7 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   const mm = d.getMonth() + 1;
   const dd = d.getDate();
   const endLabel = `${mm}/${dd}`;
+  // アクション月 = 前月（0-indexedのgetMonth()がそのまま前月の値）
   let actionMonth = d.getMonth();
   if (actionMonth === 0) actionMonth = 12;
   const preDate = getPreNoticeDate(normalized);
