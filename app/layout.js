@@ -1,5 +1,5 @@
 export const metadata = {
-  title: '期限管理 - kigen-kanri',
+  title: 'ケアプラン交付期限管理',
   description: '介護支援専門員向け期限管理システム',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 };

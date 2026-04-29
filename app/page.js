@@ -67,7 +67,7 @@ function PinScreen({onAuth}){
     }catch{setError('接続エラー');}
     setLoading(false);
   };
-  return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>期限管理システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type={showPin?'text':'password'} value={pin} onChange={e=>{setPin(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',padding:'0 40px 0 0'}}/><button type="button" onMouseDown={()=>setShowPin(true)} onMouseUp={()=>setShowPin(false)} onMouseLeave={()=>setShowPin(false)} onTouchStart={()=>setShowPin(true)} onTouchEnd={()=>setShowPin(false)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center'}}><EyeIcon show={showPin}/></button></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading?0.5:1}}>{loading?'認証中...':'ログイン'}</button></div></div>);}
+  return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>プラン期限システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type={showPin?'text':'password'} value={pin} onChange={e=>{setPin(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',padding:'0 40px 0 0'}}/><button type="button" onMouseDown={()=>setShowPin(true)} onMouseUp={()=>setShowPin(false)} onMouseLeave={()=>setShowPin(false)} onTouchStart={()=>setShowPin(true)} onTouchEnd={()=>setShowPin(false)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center'}}><EyeIcon show={showPin}/></button></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading?0.5:1}}>{loading?'認証中...':'ログイン'}</button></div></div>);}
 
 function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
   const[form,setForm]=useState({nintei_end:toInputDate(client.nintei_end),long_end:toInputDate(client.long_end),short_end:toInputDate(client.short_end)});
@@ -135,7 +135,7 @@ export default function KigenKanri(){
         <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
             <div style={{display:'flex',alignItems:'center',gap:12}}>
-              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>期限管理</h1>
+              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
               <span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -171,7 +171,7 @@ export default function KigenKanri(){
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <div>
-              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>期限管理</h1>
+              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
               <p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p>
             </div>
             {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
