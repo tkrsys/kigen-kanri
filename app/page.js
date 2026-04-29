@@ -211,7 +211,7 @@ function PinScreen({ onAuth }) {
   );
 }
 
-function DeadlineForm({ client, onSave, onClose, pin }) {
+function DeadlineForm({ client, onSave, onClose, pin, showCalendar }) {
   const [form, setForm] = useState({
     nintei_end: toInputDate(client.nintei_end),
     long_end: toInputDate(client.long_end),
@@ -252,7 +252,7 @@ function DeadlineForm({ client, onSave, onClose, pin }) {
             <input type="date" value={form[dt.key]}
               onChange={e => setForm({ ...form, [dt.key]: e.target.value })}
               style={{ width: '100%', padding: '12px', fontSize: '15px', border: '1.5px solid #E2E8F0', borderRadius: '10px', outline: 'none', boxSizing: 'border-box', color: '#1E293B' }} />
-            {form[dt.key] && <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />}
+            {showCalendar && form[dt.key] && <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />}
           </div>
         ))}
         {error && <p style={{ color: '#DC2626', fontSize: '13px', margin: '8px 0' }}>{error}</p>}
@@ -275,6 +275,7 @@ export default function KigenKanri() {
   const [expandedClient, setExpandedClient] = useState(null);
   const [editClient, setEditClient] = useState(null);
   const [managerFilter, setManagerFilter] = useState('all');
+  const [calSyncMap, setCalSyncMap] = useState({});
 
   useEffect(() => {
     const saved = localStorage.getItem('kigen-pin');
@@ -285,13 +286,34 @@ export default function KigenKanri() {
     setLoading(true);
     try {
       const res = await fetch('/api/clients', { headers: { 'x-pin': p } });
-      if (res.ok) { const data = await res.json(); setClients(data.clients || []); }
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data.clients || []);
+        // calendar_syncマップを構築
+        const syncMap = {};
+        (data.clients || []).forEach(c => {
+          if (c.care_manager) syncMap[c.care_manager] = !!c.calendar_sync;
+        });
+        setCalSyncMap(syncMap);
+      }
       else if (res.status === 401) { localStorage.removeItem('kigen-pin'); setPin(null); }
     } catch (e) { console.error(e); }
     setLoading(false);
   }, []);
 
   useEffect(() => { if (pin) fetchClients(pin); }, [pin, fetchClients]);
+
+  const handleCalSyncToggle = async (managerName) => {
+    const newVal = !calSyncMap[managerName];
+    setCalSyncMap(prev => ({ ...prev, [managerName]: newVal }));
+    try {
+      await fetch('/api/care-managers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-pin': pin },
+        body: JSON.stringify({ manager_name: managerName, calendar_sync: newVal }),
+      });
+    } catch (e) { console.error(e); }
+  };
 
   const managers = useMemo(() => {
     const set = new Set(clients.map(c => c.care_manager).filter(Boolean));
@@ -338,7 +360,7 @@ export default function KigenKanri() {
   }, [filteredClients, activeFilter]);
 
   const handleSave = (updatedClient) => {
-    setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+    setClients(prev => prev.map(c => c.id === updatedClient.id ? { ...updatedClient, calendar_sync: c.calendar_sync } : c));
     setEditClient(null);
   };
 
@@ -380,6 +402,15 @@ export default function KigenKanri() {
             </select>
           </div>
         )}
+        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {managers.map(m => (
+            <label key={m} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer', opacity: 0.9 }}>
+              <input type="checkbox" checked={!!calSyncMap[m]} onChange={() => handleCalSyncToggle(m)}
+                style={{ accentColor: '#60A5FA', width: '16px', height: '16px' }} />
+              <span>Googleカレンダーと同期：{m}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <div style={{ padding: '12px 16px 8px', display: 'flex', gap: '6px', overflowX: 'auto' }}>
@@ -418,6 +449,7 @@ export default function KigenKanri() {
           }));
           const worstInfo = client.worstStatus ? STATUS_CONFIG[client.worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
           const isExpanded = expandedClient === client.id;
+          const showCalendar = !!calSyncMap[client.care_manager];
 
           return (
             <div key={client.id} style={{ background: '#fff', borderRadius: '12px',
@@ -454,7 +486,7 @@ export default function KigenKanri() {
                         </div>
                         <DaysBadge days={dl.days} />
                       </div>
-                      <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />
+                      {showCalendar && <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />}
                     </div>
                   ))}
                   <button onClick={() => setEditClient(client)}
@@ -471,7 +503,7 @@ export default function KigenKanri() {
         )}
       </div>
 
-      {editClient && <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} />}
+      {editClient && <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} showCalendar={!!calSyncMap[editClient.care_manager]} />}
     </div>
   );
 }

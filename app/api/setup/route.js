@@ -24,6 +24,13 @@ async function ensureTables(sql) {
 
   await sql`CREATE INDEX IF NOT EXISTS idx_kigen_deadlines_client ON kigen_deadlines(client_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_kigen_calendar_client ON kigen_calendar_events(client_id)`;
+
+  // care_managersテーブルにcalendar_syncカラムを追加（存在しない場合のみ）
+  try {
+    await sql`ALTER TABLE care_managers ADD COLUMN IF NOT EXISTS calendar_sync BOOLEAN DEFAULT false`;
+  } catch (e) {
+    // カラムが既に存在する場合は無視
+  }
 }
 
 // GET: テーブル一覧表示 + 自動作成

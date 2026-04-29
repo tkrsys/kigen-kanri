@@ -9,11 +9,7 @@ import { generateIcalFeed } from '@/lib/ical-generator';
  *   ケアマネ別: /api/calendar-feed?token=XXXXX&manager=田中
  *   ケアマネ一覧: /api/calendar-feed?token=XXXXX&list=managers
  *
- * Googleカレンダーの「URLで追加」にこのURLを登録すると、
- * 数時間ごとに自動で予定が同期されます。
- *
- * 環境変数:
- *   CALENDAR_FEED_TOKEN — フィードアクセス用トークン（必須）
+ * calendar_sync=trueのケアマネの利用者のみ出力されます。
  */
 
 export async function GET(request) {
@@ -44,30 +40,26 @@ export async function GET(request) {
 
     let clients;
     if (manager) {
+      // 指定ケアマネの利用者（calendar_syncチェックなし、指定したケアマネのみ）
       clients = await sql`
         SELECT
-          c.id,
-          c.name,
-          c.care_manager,
-          kd.nintei_end,
-          kd.long_end,
-          kd.short_end
+          c.id, c.name, c.care_manager,
+          kd.nintei_end, kd.long_end, kd.short_end
         FROM clients c
         LEFT JOIN kigen_deadlines kd ON kd.client_id = c.id
+        INNER JOIN care_managers cm ON cm.name = c.care_manager AND cm.hidden = false AND cm.calendar_sync = true
         WHERE c.care_manager = ${manager}
         ORDER BY c.name
       `;
     } else {
+      // 全員（calendar_sync=trueのケアマネのみ）
       clients = await sql`
         SELECT
-          c.id,
-          c.name,
-          c.care_manager,
-          kd.nintei_end,
-          kd.long_end,
-          kd.short_end
+          c.id, c.name, c.care_manager,
+          kd.nintei_end, kd.long_end, kd.short_end
         FROM clients c
         LEFT JOIN kigen_deadlines kd ON kd.client_id = c.id
+        INNER JOIN care_managers cm ON cm.name = c.care_manager AND cm.hidden = false AND cm.calendar_sync = true
         ORDER BY c.name
       `;
     }

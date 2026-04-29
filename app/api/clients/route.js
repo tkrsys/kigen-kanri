@@ -23,9 +23,11 @@ export async function GET(request) {
         kd.nintei_end,
         kd.long_end,
         kd.short_end,
-        kd.updated_at AS deadline_updated_at
+        kd.updated_at AS deadline_updated_at,
+        COALESCE(cm.calendar_sync, false) AS calendar_sync
       FROM clients c
       LEFT JOIN kigen_deadlines kd ON kd.client_id = c.id
+      LEFT JOIN care_managers cm ON cm.name = c.care_manager AND cm.hidden = false
       ORDER BY c.name
     `;
 
