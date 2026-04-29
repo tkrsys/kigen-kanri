@@ -58,11 +58,57 @@ function DaysBadge({ days }) { if(days===null) return <span style={{fontSize:11,
 function DeadlineSummaryInline({ days, label }) { if(days===null) return <span style={{fontSize:12,color:T.muted}}>{label}:未設定</span>; const s=getStatus(days),c=STATUS_CONFIG[s]; return <span style={{fontSize:12,color:c.color,fontWeight:600}}>{label}:{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>; }
 function CalendarPreview({ typeKey, userName, dateStr }) { const titles=buildCalendarTitles(typeKey,userName,dateStr); if(!titles) return null;
   return (<div style={{marginTop:6,padding:'8px 12px',background:'#fafaf8',borderRadius:6,border:'1px solid #d8d8d0'}}><p style={{margin:0,fontSize:10,fontWeight:600,color:T.accent,marginBottom:4}}>📅 登録情報</p><div style={{fontSize:11,color:T.sub,lineHeight:1.6}}>{[titles.pre,titles.mid,titles.day].map((t,i)=>(<div key={i} style={{display:'flex',gap:6,alignItems:'flex-start',marginTop:i?3:0}}><span style={{flexShrink:0,fontSize:10,padding:'1px 6px',borderRadius:4,background:'#eceae3',color:T.sub,fontWeight:600}}>{t.date}</span><span style={{wordBreak:'break-all'}}>{t.title}</span></div>))}</div></div>); }
-function SettingsModal({ manager, calSyncMap, onToggle, onClose }) { const isSynced=!!calSyncMap[manager];
-  return (<div style={{position:'fixed',inset:0,backgroundColor:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,fontFamily:"'Noto Sans JP', sans-serif"}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{width:'100%',maxWidth:400,backgroundColor:'#fff',borderRadius:12,padding:'28px 24px',boxShadow:'0 4px 20px rgba(0,0,0,0.1)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,paddingBottom:12,borderBottom:'2px solid #2d5a7b'}}><h2 style={{margin:0,fontSize:16,fontWeight:600,color:T.text}}>設定</h2><button onClick={onClose} style={{background:'none',border:'none',fontSize:18,color:T.muted,cursor:'pointer'}}>✕</button></div><div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div><p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p><label style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,cursor:'pointer',background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`}}><input type="checkbox" checked={isSynced} onChange={()=>onToggle(manager)} style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}}/><span style={{fontSize:14,fontWeight:500,color:T.text}}>{manager}</span><span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span></label></div></div>); }
+
+function SettingsModal({ manager, calSyncMap, onToggle, onClose, onLogout, isAdmin }) {
+  const isSynced = manager ? !!calSyncMap[manager] : false;
+  return (
+    <div style={{position:'fixed',inset:0,backgroundColor:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,fontFamily:"'Noto Sans JP', sans-serif"}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{width:'100%',maxWidth:400,backgroundColor:'#fff',borderRadius:12,padding:'28px 24px',boxShadow:'0 4px 20px rgba(0,0,0,0.1)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,paddingBottom:12,borderBottom:'2px solid #2d5a7b'}}>
+          <h2 style={{margin:0,fontSize:16,fontWeight:600,color:T.text}}>設定</h2>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:18,color:T.muted,cursor:'pointer'}}>✕</button>
+        </div>
+
+        {/* カレンダー連携：管理者のみ */}
+        {isAdmin && manager && (
+          <div style={{marginBottom:24}}>
+            <div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div>
+            <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>
+              ☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
+            <label style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,cursor:'pointer',
+              background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`}}>
+              <input type="checkbox" checked={isSynced} onChange={()=>onToggle(manager)}
+                style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}} />
+              <span style={{fontSize:14,fontWeight:500,color:T.text}}>{manager}</span>
+              <span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span>
+            </label>
+          </div>
+        )}
+        {isAdmin && !manager && (
+          <div style={{marginBottom:24}}>
+            <div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div>
+            <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
+              ケアマネを選択してから設定してください。</p>
+          </div>
+        )}
+
+        {/* ログアウト */}
+        <div style={{borderTop:'1px solid #d8d8d0',paddingTop:20}}>
+          <button onClick={onLogout}
+            style={{width:'100%',padding:'10px 0',background:'#fff',color:'#c0392b',border:'1px solid #e8c8c8',borderRadius:6,fontSize:13,fontWeight:500,cursor:'pointer'}}>
+            ログアウト
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PinScreen({ onAuth }) { const[pin,setPin]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);
   const submit=async()=>{setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){localStorage.setItem('kigen-pin',pin);onAuth(pin);}else setError('PINが正しくありません');}catch{setError('接続エラー');}setLoading(false);};
   return (<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>期限管理システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type="password" inputMode="numeric" maxLength={6} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,''));setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',letterSpacing:8}}/></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading||!pin} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading||!pin?0.5:1}}>{loading?'確認中...':'ログイン'}</button></div></div>); }
+
 function DeadlineForm({ client, onSave, onClose, pin, showCalendar }) {
   const[form,setForm]=useState({nintei_end:toInputDate(client.nintei_end),long_end:toInputDate(client.long_end),short_end:toInputDate(client.short_end)});
   const[saving,setSaving]=useState(false);const[error,setError]=useState('');
@@ -76,10 +122,14 @@ export default function KigenKanri() {
   const[pin,setPin]=useState(null);const[clients,setClients]=useState([]);const[loading,setLoading]=useState(true);
   const[activeFilter,setActiveFilter]=useState('attention');const[expandedClient,setExpandedClient]=useState(null);
   const[editClient,setEditClient]=useState(null);const[managerFilter,setManagerFilter]=useState('all');
-  const[calSyncMap,setCalSyncMap]=useState({});const[settingsManager,setSettingsManager]=useState(null);
+  const[calSyncMap,setCalSyncMap]=useState({});const[showSettings,setShowSettings]=useState(false);
+  const[isAdmin,setIsAdmin]=useState(false);
 
-  useEffect(()=>{const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);
-    const savedMgr=localStorage.getItem('kigen-manager-filter');if(savedMgr)setManagerFilter(savedMgr);},[]);
+  useEffect(()=>{
+    const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);
+    const savedMgr=localStorage.getItem('kigen-manager-filter');if(savedMgr)setManagerFilter(savedMgr);
+    const savedRole=localStorage.getItem('auth_role');setIsAdmin(savedRole==='admin');
+  },[]);
   const handleManagerFilterChange=(val)=>{setManagerFilter(val);localStorage.setItem('kigen-manager-filter',val);};
 
   const fetchClients=useCallback(async(p)=>{setLoading(true);try{const res=await fetch('/api/clients',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setClients(data.clients||[]);const syncMap={};(data.clients||[]).forEach(c=>{if(c.care_manager)syncMap[c.care_manager]=!!c.calendar_sync;});setCalSyncMap(syncMap);}else if(res.status===401){localStorage.removeItem('kigen-pin');setPin(null);}}catch(e){console.error(e);}setLoading(false);},[]);
@@ -93,8 +143,10 @@ export default function KigenKanri() {
   const filteredSortedClients=useMemo(()=>{const priority={expired:0,warning:1,caution:2,safe:3};let list=filteredClients.map(c=>({...c,worstStatus:getWorstStatus(c)}));list=list.filter(c=>clientMatchesFilter(c,activeFilter));list.sort((a,b)=>{const ap=a.worstStatus===null?99:(priority[a.worstStatus]??5);const bp=b.worstStatus===null?99:(priority[b.worstStatus]??5);return ap-bp;});return list;},[filteredClients,activeFilter]);
 
   const handleSave=(updatedClient)=>{setClients(prev=>prev.map(c=>c.id===updatedClient.id?{...updatedClient,calendar_sync:c.calendar_sync}:c));setEditClient(null);};
-  const handleLogout=()=>{localStorage.removeItem('kigen-pin');setPin(null);setClients([]);};
-  const handleOpenSettings=()=>{if(managerFilter!=='all')setSettingsManager(managerFilter);else if(managers.length===1)setSettingsManager(managers[0]);else setSettingsManager(null);};
+  const handleLogout=()=>{localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setShowSettings(false);};
+
+  // 設定モーダルに渡すmanager
+  const settingsManager = managerFilter !== 'all' ? managerFilter : (managers.length === 1 ? managers[0] : null);
 
   if(!pin) return <PinScreen onAuth={p=>setPin(p)}/>;
   if(loading) return <div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif",color:T.muted}}>読み込み中...</div>;
@@ -116,10 +168,7 @@ export default function KigenKanri() {
             <h1 style={{margin:0,fontSize:20,fontWeight:600}}>期限管理</h1>
             <p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p>
           </div>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <button onClick={handleOpenSettings} style={T.btnGear} title="設定"><GearIcon/></button>
-            <button onClick={handleLogout} style={T.btnSecondary}>ログアウト</button>
-          </div>
+          <button onClick={()=>setShowSettings(true)} style={T.btnGear} title="設定"><GearIcon/></button>
         </div>
 
         {/* Search section title */}
@@ -207,7 +256,7 @@ export default function KigenKanri() {
       </div>
 
       {editClient&&<DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={()=>setEditClient(null)} showCalendar={!!calSyncMap[editClient.care_manager]}/>}
-      {settingsManager&&<SettingsModal manager={settingsManager} calSyncMap={calSyncMap} onToggle={handleCalSyncToggle} onClose={()=>setSettingsManager(null)}/>}
+      {showSettings&&<SettingsModal manager={settingsManager} calSyncMap={calSyncMap} onToggle={handleCalSyncToggle} onClose={()=>setShowSettings(false)} onLogout={handleLogout} isAdmin={isAdmin}/>}
     </div>
   );
 }
