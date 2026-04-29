@@ -50,7 +50,23 @@ function CalendarPreview({typeKey,userName,dateStr}){const titles=buildCalendarT
 
 function PinScreen({onAuth}){
   const[pin,setPin]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[showPin,setShowPin]=useState(false);
-  const submit=async()=>{if(!pin.trim()){setError('パスワードを入力してください');return;}setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){localStorage.setItem('kigen-pin',pin);onAuth(pin);}else setError('パスワードが正しくありません');}catch{setError('接続エラー');}setLoading(false);};
+  const submit=async()=>{
+    if(!pin.trim()){setError('パスワードを入力してください');return;}
+    setLoading(true);setError('');
+    try{
+      const res=await fetch('/api/clients',{headers:{'x-pin':pin}});
+      if(res.ok){
+        const data=await res.json();
+        const role=data.role||'user';
+        localStorage.setItem('kigen-pin',pin);
+        localStorage.setItem('auth_role',role);
+        onAuth(pin,role);
+      }else{
+        setError('パスワードが正しくありません');
+      }
+    }catch{setError('接続エラー');}
+    setLoading(false);
+  };
   return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>期限管理システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type={showPin?'text':'password'} value={pin} onChange={e=>{setPin(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',padding:'0 40px 0 0'}}/><button type="button" onMouseDown={()=>setShowPin(true)} onMouseUp={()=>setShowPin(false)} onMouseLeave={()=>setShowPin(false)} onTouchStart={()=>setShowPin(true)} onTouchEnd={()=>setShowPin(false)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center'}}><EyeIcon show={showPin}/></button></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading?0.5:1}}>{loading?'認証中...':'ログイン'}</button></div></div>);}
 
 function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
@@ -76,7 +92,7 @@ export default function KigenKanri(){
   useEffect(()=>{if(!showGearMenu)return;const h=e=>{if(gearRef.current&&!gearRef.current.contains(e.target))setShowGearMenu(false);};document.addEventListener('mousedown',h);return()=>document.removeEventListener('mousedown',h);},[showGearMenu]);
   const handleManagerFilterChange=(val)=>{setManagerFilter(val);localStorage.setItem('kigen-manager-filter',val);};
 
-  const fetchClients=useCallback(async(p)=>{setLoading(true);try{const res=await fetch('/api/clients',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setClients(data.clients||[]);const syncMap={};(data.clients||[]).forEach(c=>{if(c.care_manager)syncMap[c.care_manager]=!!c.calendar_sync;});setCalSyncMap(syncMap);}else if(res.status===401){localStorage.removeItem('kigen-pin');setPin(null);}}catch(e){console.error(e);}setLoading(false);},[]);
+  const fetchClients=useCallback(async(p)=>{setLoading(true);try{const res=await fetch('/api/clients',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setClients(data.clients||[]);const syncMap={};(data.clients||[]).forEach(c=>{if(c.care_manager)syncMap[c.care_manager]=!!c.calendar_sync;});setCalSyncMap(syncMap);if(data.role)localStorage.setItem('auth_role',data.role);setIsAdmin(data.role==='admin');}else if(res.status===401){localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');setPin(null);}}catch(e){console.error(e);}setLoading(false);},[]);
   useEffect(()=>{if(pin)fetchClients(pin);},[pin,fetchClients]);
 
   const handleCalSyncToggle=async(name)=>{const newVal=!calSyncMap[name];setCalSyncMap(prev=>({...prev,[name]:newVal}));try{await fetch('/api/care-managers',{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({manager_name:name,calendar_sync:newVal})});}catch(e){console.error(e);}};
@@ -87,9 +103,10 @@ export default function KigenKanri(){
   const filteredSortedClients=useMemo(()=>{const priority={expired:0,warning:1,caution:2,safe:3};let list=filteredClients.map(c=>({...c,worstStatus:getWorstStatus(c)}));list=list.filter(c=>clientMatchesFilter(c,activeFilter));list.sort((a,b)=>{const ap=a.worstStatus===null?99:(priority[a.worstStatus]??5);const bp=b.worstStatus===null?99:(priority[b.worstStatus]??5);return ap-bp;});return list;},[filteredClients,activeFilter]);
 
   const handleSave=(updatedClient)=>{setClients(prev=>prev.map(c=>c.id===updatedClient.id?{...updatedClient,calendar_sync:c.calendar_sync}:c));setEditClient(null);};
-  const handleLogout=()=>{setShowGearMenu(false);localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);};
+  const handleLogout=()=>{setShowGearMenu(false);localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setIsAdmin(false);};
+  const handleAuth=(p,role)=>{setPin(p);setIsAdmin(role==='admin');};
 
-  if(!pin)return<PinScreen onAuth={p=>setPin(p)}/>;
+  if(!pin)return<PinScreen onAuth={handleAuth}/>;
   if(loading)return<div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif",color:T.muted}}>読み込み中...</div>;
 
   const FILTER_ITEMS=[
@@ -119,7 +136,7 @@ export default function KigenKanri(){
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
             <div style={{display:'flex',alignItems:'center',gap:12}}>
               <h1 style={{margin:0,fontSize:20,fontWeight:600}}>期限管理</h1>
-              {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
+              <span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <button onClick={()=>setMode('list')} style={T.btnBack}>← 戻る</button>
@@ -152,13 +169,14 @@ export default function KigenKanri(){
     <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-          <div>
-            <h1 style={{margin:0,fontSize:20,fontWeight:600}}>期限管理</h1>
-            <p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div>
+              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>期限管理</h1>
+              <p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p>
+            </div>
+            {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            {gearMenu}
-          </div>
+          {gearMenu}
         </div>
 
         <div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
