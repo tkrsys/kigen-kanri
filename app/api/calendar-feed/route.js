@@ -7,6 +7,7 @@ import { generateIcalFeed } from '@/lib/ical-generator';
  * 使い方:
  *   全員: /api/calendar-feed?token=XXXXX
  *   ケアマネ別: /api/calendar-feed?token=XXXXX&manager=田中
+ *   ケアマネ一覧: /api/calendar-feed?token=XXXXX&list=managers
  *
  * Googleカレンダーの「URLで追加」にこのURLを登録すると、
  * 数時間ごとに自動で予定が同期されます。
@@ -25,8 +26,21 @@ export async function GET(request) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const manager = url.searchParams.get('manager');
     const sql = getDb();
+
+    // ケアマネ一覧を返すモード
+    const list = url.searchParams.get('list');
+    if (list === 'managers') {
+      const managers = await sql`
+        SELECT DISTINCT care_manager
+        FROM clients
+        WHERE care_manager IS NOT NULL
+        ORDER BY care_manager
+      `;
+      return Response.json({ managers: managers.map(m => m.care_manager) });
+    }
+
+    const manager = url.searchParams.get('manager');
 
     let clients;
     if (manager) {
