@@ -71,22 +71,9 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   const preDateObj = new Date(preDate + 'T00:00:00');
   const preDateLabel = `${preDateObj.getMonth() + 1}/${preDateObj.getDate()}`;
   return {
-    pre: { date: preDate, dateLabel: preDateLabel, title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${actionMonth}月 ${config.preAction})` },
-    day: { date: normalized, dateLabel: `${mm}/${dd}`, title: `【${config.label}】${userName} ${config.dayAction}` },
+    pre: { date: preDateLabel, title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${actionMonth}月 ${config.preAction})` },
+    day: { date: `${mm}/${dd}`, title: `【${config.label}】${userName} ${config.dayAction}` },
   };
-}
-
-function buildGoogleCalendarUrl(title, dateStr) {
-  const d = dateStr.replace(/-/g, '');
-  const nextDay = new Date(dateStr + 'T00:00:00');
-  nextDay.setDate(nextDay.getDate() + 1);
-  const nd = `${nextDay.getFullYear()}${String(nextDay.getMonth() + 1).padStart(2, '0')}${String(nextDay.getDate()).padStart(2, '0')}`;
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: title,
-    dates: `${d}/${nd}`,
-  });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
 function getWorstStatus(client) {
@@ -123,22 +110,6 @@ function DaysBadge({ days }) {
   );
 }
 
-function AddToCalendarButton({ title, dateStr }) {
-  const url = buildGoogleCalendarUrl(title, dateStr);
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px',
-        padding: '4px 10px', borderRadius: '6px', fontSize: '10px', fontWeight: 600,
-        color: '#1a73e8', background: '#E8F0FE', border: '1px solid #C2D9F2',
-        textDecoration: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-        marginTop: '4px', transition: 'background 0.15s' }}
-      onMouseOver={e => e.currentTarget.style.background = '#D2E3FC'}
-      onMouseOut={e => e.currentTarget.style.background = '#E8F0FE'}>
-      📅 Googleカレンダーに追加
-    </a>
-  );
-}
-
 function CalendarPreview({ typeKey, userName, dateStr }) {
   const titles = buildCalendarTitles(typeKey, userName, dateStr);
   if (!titles) return null;
@@ -149,65 +120,17 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
         📅 カレンダー登録予定
       </p>
       <div style={{ fontSize: '11px', color: '#78350F', lineHeight: 1.6 }}>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
-            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.pre.dateLabel}</span>
-          <span style={{ wordBreak: 'break-all', flex: 1 }}>{titles.pre.title}</span>
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.pre.date}</span>
+          <span style={{ wordBreak: 'break-all' }}>{titles.pre.title}</span>
         </div>
-        <div style={{ paddingLeft: '2px', marginTop: '2px' }}>
-          <AddToCalendarButton title={titles.pre.title} dateStr={titles.pre.date} />
-        </div>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '6px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '3px' }}>
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
-            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.day.dateLabel}</span>
-          <span style={{ wordBreak: 'break-all', flex: 1 }}>{titles.day.title}</span>
-        </div>
-        <div style={{ paddingLeft: '2px', marginTop: '2px' }}>
-          <AddToCalendarButton title={titles.day.title} dateStr={titles.day.date} />
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.day.date}</span>
+          <span style={{ wordBreak: 'break-all' }}>{titles.day.title}</span>
         </div>
       </div>
-    </div>
-  );
-}
-
-function CalendarBulkAdd({ client }) {
-  const allEvents = [];
-  for (const dt of DEADLINE_TYPES) {
-    const dateStr = client[dt.key];
-    if (!dateStr) continue;
-    const titles = buildCalendarTitles(dt.key, client.name, dateStr);
-    if (!titles) continue;
-    allEvents.push({ ...titles.pre, label: `${CAL_CONFIG[dt.key].label} 2ヶ月前` });
-    allEvents.push({ ...titles.day, label: `${CAL_CONFIG[dt.key].label} 当日` });
-  }
-  if (allEvents.length === 0) return null;
-  return (
-    <div style={{ marginTop: '12px', padding: '12px', background: '#EFF6FF',
-      borderRadius: '10px', border: '1px solid #BFDBFE' }}>
-      <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 700, color: '#1E40AF' }}>
-        📅 まとめてカレンダーに追加（{allEvents.length}件）
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {allEvents.map((ev, i) => (
-          <a key={i} href={buildGoogleCalendarUrl(ev.title, ev.date)}
-            target="_blank" rel="noopener noreferrer"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '8px 10px', borderRadius: '8px', fontSize: '11px',
-              color: '#1E3A5F', background: '#fff', border: '1px solid #DBEAFE',
-              textDecoration: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
-            onMouseOver={e => e.currentTarget.style.background = '#F0F7FF'}
-            onMouseOut={e => e.currentTarget.style.background = '#fff'}>
-            <span style={{ flexShrink: 0, fontSize: '10px', padding: '2px 6px',
-              borderRadius: '4px', background: '#DBEAFE', color: '#1E40AF',
-              fontWeight: 600 }}>{ev.dateLabel}</span>
-            <span style={{ flex: 1, wordBreak: 'break-all' }}>{ev.title}</span>
-            <span style={{ flexShrink: 0, fontSize: '14px' }}>＋</span>
-          </a>
-        ))}
-      </div>
-      <p style={{ margin: '8px 0 0', fontSize: '10px', color: '#6B7280', lineHeight: 1.5 }}>
-        ※ 各リンクをタップするとGoogleカレンダーの登録画面が開きます。ご自身のカレンダーに追加できます。
-      </p>
     </div>
   );
 }
@@ -490,9 +413,9 @@ export default function KigenKanri() {
                         </div>
                         <DaysBadge days={dl.days} />
                       </div>
+                      <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />
                     </div>
                   ))}
-                  <CalendarBulkAdd client={client} />
                   <button onClick={() => setEditClient(client)}
                     style={{ width: '100%', padding: '10px', marginTop: '10px', fontSize: '13px',
                       fontWeight: 600, background: '#F1F5F9', color: '#475569', border: 'none',
