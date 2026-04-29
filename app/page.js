@@ -78,7 +78,7 @@ function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
     {DEADLINE_TYPES.map(dt=>(<div key={dt.key} style={{marginBottom:16}}><label style={{display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6}}>{dt.label}</label><input type="date" value={form[dt.key]} onChange={e=>setForm({...form,[dt.key]:e.target.value})} style={{width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text}}/>{showCalendar&&form[dt.key]&&visibleCalKeys.includes(dt.key)&&<CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]}/>}</div>))}
     {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);}
 
-function RegisterScreen({pin,onBack,onRegistered,managers:managerList}){
+function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu}){
   const[name,setName]=useState('');const[careManager,setCareManager]=useState(managerList[0]||'');
   const[ninteiEnd,setNinteiEnd]=useState('');const[longEnd,setLongEnd]=useState('');const[shortEnd,setShortEnd]=useState('');
   const[saving,setSaving]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
@@ -115,13 +115,20 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList}){
     <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-          <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
+            <span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>
+          </div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <button onClick={onBack} style={T.btnBack}>← 戻る</button>
+            {gearMenu}
           </div>
         </div>
 
-        <div style={{fontWeight:700,fontSize:16,color:T.text,marginBottom:20}}>利用者登録</div>
+        <div style={{fontWeight:700,fontSize:16,color:T.text,marginBottom:16}}>利用者登録</div>
+
+        {error&&<div style={{padding:'10px 16px',background:'#fdf0ee',border:'1px solid #e8c8c8',borderRadius:6,marginBottom:16,fontSize:13,color:'#c0392b'}}>{error}</div>}
+        {success&&<div style={{padding:'10px 16px',background:'#e8f5f0',border:'1px solid #b8ddd0',borderRadius:6,marginBottom:16,fontSize:13,color:'#27766a'}}>✓ {success}</div>}
 
         <div style={T.card}>
           <div style={{marginBottom:16}}>
@@ -152,13 +159,10 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList}){
             <label style={labelStyle}>短期期限</label>
             <input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/>
           </div>
+        </div>
 
-          {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}
-          {success&&<p style={{color:'#27766a',fontSize:13,margin:'8px 0',fontWeight:500}}>✓ {success}</p>}
-
-          <div style={{display:'flex',justifyContent:'flex-end',marginTop:20}}>
-            <button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button>
-          </div>
+        <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}>
+          <button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button>
         </div>
 
         <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
@@ -204,18 +208,6 @@ export default function KigenKanri(){
   if(!pin)return<PinScreen onAuth={handleAuth}/>;
   if(loading)return<div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif",color:T.muted}}>読み込み中...</div>;
 
-  if(mode==='register'){
-    return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers}/>;
-  }
-
-  const FILTER_ITEMS=[
-    {key:'safe',label:'余裕あり',color:STATUS_CONFIG.safe.color,count:summary.safe},
-    {key:'attention',label:'要注意',count:summary.attention,color:'#8b6914'},
-    {key:'warning',label:'30日以内',color:STATUS_CONFIG.warning.color,count:summary.warning},
-    {key:'expired',label:'期限切れ',color:STATUS_CONFIG.expired.color,count:summary.expired},
-    {key:'unset',label:'未登録',color:T.muted,count:summary.unset},
-  ];
-
   const gearMenu = (
     <div ref={gearRef} style={{position:'relative'}}>
       <button onClick={()=>setShowGearMenu(!showGearMenu)} style={T.btnGear}><GearIcon/></button>
@@ -228,6 +220,18 @@ export default function KigenKanri(){
       )}
     </div>
   );
+
+  if(mode==='register'){
+    return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers} gearMenu={gearMenu}/>;
+  }
+
+  const FILTER_ITEMS=[
+    {key:'safe',label:'余裕あり',color:STATUS_CONFIG.safe.color,count:summary.safe},
+    {key:'attention',label:'要注意',count:summary.attention,color:'#8b6914'},
+    {key:'warning',label:'30日以内',color:STATUS_CONFIG.warning.color,count:summary.warning},
+    {key:'expired',label:'期限切れ',color:STATUS_CONFIG.expired.color,count:summary.expired},
+    {key:'unset',label:'未登録',color:T.muted,count:summary.unset},
+  ];
 
   if(mode==='calendarSync'){
     return(
