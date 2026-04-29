@@ -129,6 +129,19 @@ function DaysBadge({ days }) {
   );
 }
 
+function DeadlineSummaryLine({ days, label }) {
+  if (days === null) return (
+    <span style={{ fontSize: '11px', color: '#94A3B8' }}>{label}:未設定</span>
+  );
+  const status = getStatus(days);
+  const c = STATUS_CONFIG[status];
+  return (
+    <span style={{ fontSize: '11px', color: c.color, fontWeight: 600 }}>
+      {label}:{status === 'expired' ? `${Math.abs(days)}日超過` : `あと${days}日`}
+    </span>
+  );
+}
+
 function CalendarPreview({ typeKey, userName, dateStr }) {
   const titles = buildCalendarTitles(typeKey, userName, dateStr);
   if (!titles) return null;
@@ -411,18 +424,23 @@ export default function KigenKanri() {
               marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
               borderLeft: `4px solid ${worstInfo.color}`, overflow: 'hidden' }}>
               <div onClick={() => setExpandedClient(isExpanded ? null : client.id)}
-                style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex',
+                style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex',
                   justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '14px', fontWeight: 700 }}>{client.name}</span>
                     <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '10px',
                       background: worstInfo.bg, color: worstInfo.color, fontWeight: 600,
                       border: `1px solid ${worstInfo.color}22` }}>{worstInfo.label}</span>
+                    {client.care_manager && <span style={{ fontSize: '11px', color: '#94A3B8' }}>担当: {client.care_manager}</span>}
                   </div>
-                  {client.care_manager && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' }}>担当: {client.care_manager}</p>}
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    {DEADLINE_TYPES.map(dt => (
+                      <DeadlineSummaryLine key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short} />
+                    ))}
+                  </div>
                 </div>
-                <span style={{ fontSize: '16px', color: '#94A3B8',
+                <span style={{ fontSize: '16px', color: '#94A3B8', flexShrink: 0, marginLeft: '8px',
                   transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
               </div>
               {isExpanded && (
