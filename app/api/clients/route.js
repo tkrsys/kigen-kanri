@@ -59,10 +59,21 @@ export async function POST(request) {
       return Response.json({ error: '担当ケアマネジャーは必須です' }, { status: 400 });
     }
 
+    const trimmedName = name.trim();
+    const trimmedManager = care_manager.trim();
+
+    // 同一名の重複チェック
+    const existing = await sql`
+      SELECT id FROM clients WHERE name = ${trimmedName}
+    `;
+    if (existing.length > 0) {
+      return Response.json({ error: `「${trimmedName}」は既に登録されています` }, { status: 409 });
+    }
+
     // clients テーブルに登録
     const r = await sql`
       INSERT INTO clients (name, care_manager)
-      VALUES (${name.trim()}, ${care_manager.trim()})
+      VALUES (${trimmedName}, ${trimmedManager})
       RETURNING *
     `;
     const newClient = r[0];
