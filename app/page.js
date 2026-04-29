@@ -6,9 +6,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 // ============================================================
 const STATUS_CONFIG = {
   expired:  { label: '期限切れ', color: '#DC2626', bg: '#FEF2F2' },
-  critical: { label: '14日以内', color: '#EA580C', bg: '#FFF7ED' },
-  warning:  { label: '30日以内', color: '#CA8A04', bg: '#FEFCE8' },
-  caution:  { label: '60日以内', color: '#2563EB', bg: '#EFF6FF' },
+  warning:  { label: '30日以内', color: '#EA580C', bg: '#FFF7ED' },
+  caution:  { label: '75日以内', color: '#CA8A04', bg: '#FEFCE8' },
   safe:     { label: '余裕あり', color: '#16A34A', bg: '#F0FDF4' },
 };
 
@@ -40,9 +39,8 @@ function getDaysUntil(dateStr) {
 function getStatus(days) {
   if (days === null) return null;
   if (days < 0) return 'expired';
-  if (days <= 14) return 'critical';
   if (days <= 30) return 'warning';
-  if (days <= 60) return 'caution';
+  if (days <= 75) return 'caution';
   return 'safe';
 }
 
@@ -362,7 +360,7 @@ export default function KigenKanri() {
 
   // サマリー
   const summary = useMemo(() => {
-    const counts = { expired: 0, critical: 0, warning: 0, caution: 0, safe: 0, unset: 0 };
+    const counts = { expired: 0, warning: 0, caution: 0, safe: 0, unset: 0 };
     allDeadlines.forEach(d => {
       if (d.status === null) counts.unset++;
       else counts[d.status]++;
@@ -381,7 +379,7 @@ export default function KigenKanri() {
 
   // 利用者別: 最悪ステータスでソート
   const sortedClients = useMemo(() => {
-    const priority = { expired: 0, critical: 1, warning: 2, caution: 3, safe: 4 };
+    const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
     return [...filteredClients].sort((a, b) => {
       const aWorst = Math.min(...DEADLINE_TYPES.map(dt => {
         const days = getDaysUntil(a[dt.key]);
@@ -424,7 +422,6 @@ export default function KigenKanri() {
   const FILTER_ITEMS = [
     { key: 'all', label: '全て', count: allDeadlines.filter(d => d.days !== null).length, color: '#1E3A5F' },
     { key: 'expired', ...STATUS_CONFIG.expired, count: summary.expired },
-    { key: 'critical', ...STATUS_CONFIG.critical, count: summary.critical },
     { key: 'warning', ...STATUS_CONFIG.warning, count: summary.warning },
     { key: 'caution', ...STATUS_CONFIG.caution, count: summary.caution },
     { key: 'safe', ...STATUS_CONFIG.safe, count: summary.safe },
@@ -497,17 +494,17 @@ export default function KigenKanri() {
       </div>
 
       {/* アラートバナー */}
-      {(summary.expired > 0 || summary.critical > 0) && (
+      {(summary.expired > 0 || summary.warning > 0) && (
         <div style={{ margin: '8px 16px', padding: '12px 16px', borderRadius: '12px',
           background: 'linear-gradient(135deg, #FEF2F2, #FFF7ED)',
           border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '24px' }}>⚠️</span>
           <div>
             <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626' }}>
-              要対応: {summary.expired + summary.critical}件
+              要対応: {summary.expired + summary.warning}件
             </p>
             <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>
-              期限切れ {summary.expired}件 ・ 14日以内 {summary.critical}件
+              期限切れ {summary.expired}件 ・ 30日以内 {summary.warning}件
             </p>
           </div>
         </div>
@@ -563,7 +560,7 @@ export default function KigenKanri() {
               }));
               const worstStatus = deadlines.reduce((w, d) => {
                 if (d.status === null) return w;
-                const p = { expired: 0, critical: 1, warning: 2, caution: 3, safe: 4 };
+                const p = { expired: 0, warning: 1, caution: 2, safe: 3 };
                 return (w === null || p[d.status] < p[w]) ? d.status : w;
               }, null);
               const worstInfo = worstStatus ? STATUS_CONFIG[worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
