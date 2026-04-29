@@ -93,15 +93,10 @@ function getVisibleCalendarKeys(client) {
   return keys;
 }
 
-// --- Shared Styles (careplan-delivery統一) ---
 const T = {
   bg: '#f5f3ee',
   card: { background:'#fff', border:'1px solid #d8d8d0', borderRadius:8, padding:'16px 20px', marginBottom:12, boxShadow:'0 1px 3px rgba(0,0,0,.06)' },
-  accent: '#2d5a7b',
-  text: '#1a1a2e',
-  sub: '#4a4a5a',
-  muted: '#8888a0',
-  border: '#d8d8d0',
+  accent: '#2d5a7b', text: '#1a1a2e', sub: '#4a4a5a', muted: '#8888a0', border: '#d8d8d0',
   barStyle: { display:'inline-block', width:3, height:16, background:'#2d5a7b', borderRadius:2 },
   secTitle: { fontSize:14, fontWeight:600, color:'#2d5a7b', display:'flex', alignItems:'center', gap:8, marginBottom:12 },
   btnPrimary: { padding:'8px 18px', background:'#2d5a7b', color:'#fff', border:'none', borderRadius:6, fontSize:13, fontWeight:500, cursor:'pointer' },
@@ -117,10 +112,10 @@ function DaysBadge({ days }) {
   return <span style={{ fontSize:11, fontWeight:600, color:c.color, background:c.bg, padding:'2px 8px', borderRadius:4 }}>
     {status === 'expired' ? `${Math.abs(days)}日超過` : `あと${days}日`}</span>;
 }
-function DeadlineSummaryLine({ days, label }) {
-  if (days === null) return <span style={{ fontSize:11, color:T.muted }}>{label}:未設定</span>;
+function DeadlineSummaryInline({ days, label }) {
+  if (days === null) return <span style={{ fontSize:12, color:T.muted }}>{label}:未設定</span>;
   const status = getStatus(days); const c = STATUS_CONFIG[status];
-  return <span style={{ fontSize:11, color:c.color, fontWeight:600 }}>{label}:{status === 'expired' ? `${Math.abs(days)}日超過` : `あと${days}日`}</span>;
+  return <span style={{ fontSize:12, color:c.color, fontWeight:600 }}>{label}:{status === 'expired' ? `${Math.abs(days)}日超過` : `あと${days}日`}</span>;
 }
 function CalendarPreview({ typeKey, userName, dateStr }) {
   const titles = buildCalendarTitles(typeKey, userName, dateStr); if (!titles) return null;
@@ -164,7 +159,6 @@ function SettingsModal({ manager, calSyncMap, onToggle, onClose }) {
 }
 function PinScreen({ onAuth }) {
   const [pin, setPin] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
-  const [showPin, setShowPin] = useState(false);
   const submit = async () => { setLoading(true); setError('');
     try { const res = await fetch('/api/clients', { headers: { 'x-pin': pin } });
       if (res.ok) { localStorage.setItem('kigen-pin', pin); onAuth(pin); } else setError('PINが正しくありません');
@@ -176,10 +170,10 @@ function PinScreen({ onAuth }) {
         <h2 style={{ fontSize:18, fontWeight:600, marginBottom:8 }}>期限管理システム</h2>
         <p style={{ fontSize:13, color:T.muted, marginBottom:24 }}>パスワードを入力してアクセス</p>
         <div style={{ position:'relative', marginBottom:16, height:48 }}>
-          <input type={showPin?'text':'password'} inputMode="numeric" maxLength={6} value={pin}
+          <input type="password" inputMode="numeric" maxLength={6} value={pin}
             onChange={e => { setPin(e.target.value.replace(/\D/g,'')); setError(''); }}
             onKeyDown={e => e.key==='Enter' && submit()} placeholder="パスワード" autoFocus
-            style={{ textAlign:'center', fontSize:16, width:'100%', height:48, lineHeight:'48px', boxSizing:'border-box', padding:'0 40px 0 0', letterSpacing:8 }} />
+            style={{ textAlign:'center', fontSize:16, width:'100%', height:48, lineHeight:'48px', boxSizing:'border-box', letterSpacing:8 }} />
         </div>
         {error && <p style={{ color:'#c0392b', fontSize:13, marginBottom:12 }}>{error}</p>}
         <button onClick={submit} disabled={loading || !pin}
@@ -278,7 +272,6 @@ export default function KigenKanri() {
   return (
     <div style={{ fontFamily:"'Noto Sans JP', sans-serif", background:T.bg, minHeight:'100vh', color:T.text }}>
       <div style={{ maxWidth:880, margin:'0 auto', padding:'24px 16px 100px' }}>
-        {/* Header */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, paddingBottom:16, borderBottom:'2px solid #2d5a7b' }}>
           <div>
             <h1 style={{ margin:0, fontSize:20, fontWeight:600 }}>期限管理</h1>
@@ -292,7 +285,6 @@ export default function KigenKanri() {
           </div>
         </div>
 
-        {/* Manager filter */}
         {managers.length > 1 && (
           <div style={{ marginBottom:16 }}>
             <select value={managerFilter} onChange={e => handleManagerFilterChange(e.target.value)}
@@ -303,7 +295,6 @@ export default function KigenKanri() {
           </div>
         )}
 
-        {/* Filters */}
         <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto', paddingBottom:4 }}>
           {FILTER_ITEMS.map(item => (
             <button key={item.key} onClick={() => setActiveFilter(item.key)} style={{
@@ -315,7 +306,6 @@ export default function KigenKanri() {
           ))}
         </div>
 
-        {/* Alert */}
         {(summary.expired > 0 || summary.warning > 0) && (
           <div style={{ ...T.card, padding:'12px 16px', marginBottom:16, background:'#fdf0ee', border:'1px solid #e8c8c8', display:'flex', alignItems:'center', gap:10 }}>
             <span style={{ fontSize:22 }}>⚠️</span>
@@ -326,12 +316,12 @@ export default function KigenKanri() {
           </div>
         )}
 
-        {/* Client list */}
         <div style={{ borderTop:'1px solid #d8d8d0', paddingTop:12, marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <span style={{ fontSize:14, fontWeight:600, color:T.accent }}>利用者一覧</span>
           <span style={{ fontSize:12, color:T.muted, background:'#eceae3', padding:'2px 10px', borderRadius:10, fontWeight:500 }}>{filteredSortedClients.length}名</span>
         </div>
 
+        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
         {filteredSortedClients.map(client => {
           const deadlines = DEADLINE_TYPES.map(dt => ({...dt, date:client[dt.key], days:getDaysUntil(client[dt.key]), status:getStatus(getDaysUntil(client[dt.key]))}));
           const worstInfo = client.worstStatus ? STATUS_CONFIG[client.worstStatus] : { color:T.muted, bg:'#eceae3', label:'未設定' };
@@ -339,20 +329,16 @@ export default function KigenKanri() {
           const showCalendar = !!calSyncMap[client.care_manager];
           const visibleCalKeys = getVisibleCalendarKeys(client);
           return (
-            <div key={client.id} style={{ ...T.card, borderLeft:`4px solid ${worstInfo.color}`, padding:0, overflow:'hidden' }}>
+            <div key={client.id} style={{ background:'#fff', border:'1px solid #d8d8d0', borderRadius:6, borderLeft:`4px solid ${worstInfo.color}`, overflow:'hidden', boxShadow:'0 1px 2px rgba(0,0,0,.04)' }}>
               <div onClick={() => setExpandedClient(isExpanded ? null : client.id)}
-                style={{ padding:'12px 16px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:14, fontWeight:600 }}>{client.name}</span>
-                    <span style={{ fontSize:10, fontWeight:600, color:worstInfo.color, background:worstInfo.bg, padding:'2px 8px', borderRadius:4 }}>{worstInfo.label}</span>
-                    {client.care_manager && <span style={{ fontSize:11, color:T.muted }}>担当: {client.care_manager}</span>}
-                  </div>
-                  <div style={{ display:'flex', gap:12, marginTop:6, flexWrap:'wrap' }}>
-                    {DEADLINE_TYPES.map(dt => <DeadlineSummaryLine key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short} />)}
-                  </div>
-                </div>
-                <span style={{ fontSize:13, color:T.muted, flexShrink:0, marginLeft:8, transform:isExpanded?'rotate(180deg)':'rotate(0deg)', transition:'transform 0.2s' }}>▼</span>
+                style={{ padding:'8px 16px', cursor:'pointer', display:'flex', alignItems:'center' }}>
+                <span style={{ fontSize:14, fontWeight:600, minWidth:100, flexShrink:0 }}>{client.name}</span>
+                <span style={{ fontSize:10, fontWeight:600, color:worstInfo.color, background:worstInfo.bg, padding:'2px 8px', borderRadius:4, flexShrink:0, marginRight:10 }}>{worstInfo.label}</span>
+                {client.care_manager && <span style={{ fontSize:12, color:T.muted, flexShrink:0, marginRight:16 }}>担当:{client.care_manager}</span>}
+                <span style={{ display:'flex', gap:12, alignItems:'center', flex:1, justifyContent:'flex-end', marginRight:8 }}>
+                  {DEADLINE_TYPES.map(dt => <DeadlineSummaryInline key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short} />)}
+                </span>
+                <span style={{ fontSize:13, color:T.muted, flexShrink:0, transform:isExpanded?'rotate(180deg)':'rotate(0deg)', transition:'transform 0.2s' }}>▼</span>
               </div>
               {isExpanded && (
                 <div style={{ padding:'0 16px 14px', borderTop:'1px solid #eceae3' }}>
@@ -374,6 +360,7 @@ export default function KigenKanri() {
             </div>
           );
         })}
+        </div>
         {filteredSortedClients.length === 0 && (
           <div style={{ textAlign:'center', padding:40, color:T.muted }}><div style={{ fontSize:40, marginBottom:12 }}>📋</div><p>該当する利用者はいません</p></div>
         )}
