@@ -79,7 +79,7 @@ function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
     {DEADLINE_TYPES.map(dt=>(<div key={dt.key} style={{marginBottom:16}}><label style={{display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6}}>{dt.label}</label><input type="date" value={form[dt.key]} onChange={e=>setForm({...form,[dt.key]:e.target.value})} style={{width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text}}/>{showCalendar&&form[dt.key]&&visibleCalKeys.includes(dt.key)&&<CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]}/>}</div>))}
     {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);}
 
-function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu}){
+function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,isAdmin}){
   const[name,setName]=useState('');const[careManager,setCareManager]=useState(managerList[0]||'');
   const[ninteiEnd,setNinteiEnd]=useState('');const[longEnd,setLongEnd]=useState('');const[shortEnd,setShortEnd]=useState('');
   const[saving,setSaving]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
@@ -118,7 +118,7 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu})
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
-            <span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>
+            {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <button onClick={onBack} style={T.btnBack}>← 戻る</button>
@@ -225,7 +225,7 @@ export default function KigenKanri(){
   );
 
   if(mode==='register'){
-    return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers} gearMenu={gearMenu}/>;
+    return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers} gearMenu={gearMenu} isAdmin={isAdmin}/>;
   }
 
   const FILTER_ITEMS=[
@@ -284,7 +284,7 @@ export default function KigenKanri(){
             {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            {isAdmin&&<button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>}
+            <button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>
             {gearMenu}
           </div>
         </div>
