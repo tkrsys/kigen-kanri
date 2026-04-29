@@ -73,21 +73,17 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   const mm = d.getMonth() + 1;
   const dd = d.getDate();
   const endLabel = `${mm}/${dd}`;
-
   const preDate = getNoticeDateStr(normalized, 2);
   const preDateObj = new Date(preDate + 'T00:00:00');
   const preDateLabel = `${preDateObj.getMonth() + 1}/${preDateObj.getDate()}`;
   const preMonth = getActionMonth(normalized, -1);
-
   const midDate = getNoticeDateStr(normalized, 1);
   const midDateObj = new Date(midDate + 'T00:00:00');
   const midDateLabel = `${midDateObj.getMonth() + 1}/${midDateObj.getDate()}`;
   const midMonth = getActionMonth(normalized, 0);
-
   const dayDate = getNoticeDateStr(normalized, 0);
   const dayDateObj = new Date(dayDate + 'T00:00:00');
   const dayDateLabel = `${dayDateObj.getMonth() + 1}/${dayDateObj.getDate()}`;
-
   return {
     pre: { date: preDateLabel, title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${preMonth}月 ${config.preAction})` },
     mid: { date: midDateLabel, title: `【${config.label} 1ヶ月前】${userName} ${endLabel}(${midMonth}月 ${config.midAction})` },
@@ -166,6 +162,47 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
             borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.day.date}</span>
           <span style={{ wordBreak: 'break-all' }}>{titles.day.title}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({ managers, calSyncMap, onToggle, onClose }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100,
+      fontFamily: "'Noto Sans JP', sans-serif" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff',
+        borderRadius: '20px 20px 0 0', padding: '24px 20px 32px', maxHeight: '85vh', overflow: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>設定</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94A3B8', cursor: 'pointer', padding: '8px' }}>✕</button>
+        </div>
+        <div style={{ marginBottom: '16px' }}>
+          <p style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600, color: '#334155' }}>Googleカレンダー同期</p>
+          <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>
+            ☑のケアマネの担当利用者の期限予定がGoogleカレンダーに自動同期されます。
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {managers.map(m => (
+              <label key={m} style={{ display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '12px 14px', borderRadius: '10px', cursor: 'pointer',
+                background: calSyncMap[m] ? '#EFF6FF' : '#F8FAFC',
+                border: `1.5px solid ${calSyncMap[m] ? '#93C5FD' : '#E2E8F0'}`,
+                transition: 'all 0.15s' }}>
+                <input type="checkbox" checked={!!calSyncMap[m]} onChange={() => onToggle(m)}
+                  style={{ accentColor: '#3B82F6', width: '18px', height: '18px', flexShrink: 0 }} />
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>{m}</span>
+                  <span style={{ fontSize: '11px', color: calSyncMap[m] ? '#2563EB' : '#94A3B8', marginLeft: '8px' }}>
+                    {calSyncMap[m] ? '同期ON' : '同期OFF'}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -276,6 +313,7 @@ export default function KigenKanri() {
   const [editClient, setEditClient] = useState(null);
   const [managerFilter, setManagerFilter] = useState('all');
   const [calSyncMap, setCalSyncMap] = useState({});
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('kigen-pin');
@@ -289,7 +327,6 @@ export default function KigenKanri() {
       if (res.ok) {
         const data = await res.json();
         setClients(data.clients || []);
-        // calendar_syncマップを構築
         const syncMap = {};
         (data.clients || []).forEach(c => {
           if (c.care_manager) syncMap[c.care_manager] = !!c.calendar_sync;
@@ -391,7 +428,11 @@ export default function KigenKanri() {
               {new Date().getFullYear()}年{new Date().getMonth() + 1}月{new Date().getDate()}日 現在・{clients.length}名
             </p>
           </div>
-          <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '12px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>ログアウト</button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button onClick={() => setShowSettings(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '16px', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer' }}
+              title="設定">⚙</button>
+            <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '12px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>ログアウト</button>
+          </div>
         </div>
         {managers.length > 1 && (
           <div style={{ marginTop: '12px' }}>
@@ -402,15 +443,6 @@ export default function KigenKanri() {
             </select>
           </div>
         )}
-        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {managers.map(m => (
-            <label key={m} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer', opacity: 0.9 }}>
-              <input type="checkbox" checked={!!calSyncMap[m]} onChange={() => handleCalSyncToggle(m)}
-                style={{ accentColor: '#60A5FA', width: '16px', height: '16px' }} />
-              <span>Googleカレンダーと同期：{m}</span>
-            </label>
-          ))}
-        </div>
       </div>
 
       <div style={{ padding: '12px 16px 8px', display: 'flex', gap: '6px', overflowX: 'auto' }}>
@@ -504,6 +536,7 @@ export default function KigenKanri() {
       </div>
 
       {editClient && <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} showCalendar={!!calSyncMap[editClient.care_manager]} />}
+      {showSettings && <SettingsModal managers={managers} calSyncMap={calSyncMap} onToggle={handleCalSyncToggle} onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
