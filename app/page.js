@@ -18,6 +18,13 @@ const DEADLINE_TYPES = [
   { key: 'short_end', label: '短期期限', short: '短期' },
 ];
 
+// カレンダー書き込みタイトル生成用
+const CAL_CONFIG = {
+  nintei_end: { label: '認定期限', preAction: '認定調査 ｱｾｽﾒﾝﾄ', dayAction: '担当者会議＋計画書交付' },
+  long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', dayAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
+  short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', dayAction: '意見照会＋ﾌﾟﾗﾝ交付' },
+};
+
 // ============================================================
 // ユーティリティ
 // ============================================================
@@ -51,6 +58,41 @@ function toInputDate(dateStr) {
   return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
 }
 
+// カレンダー予定タイトル生成（フロントエンド用）
+function getPreNoticeDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  let year = d.getFullYear();
+  let month = d.getMonth() - 1;
+  if (month < 0) { month += 12; year -= 1; }
+  return `${year}-${String(month + 1).padStart(2, '0')}-25`;
+}
+
+function buildCalendarTitles(typeKey, userName, dateStr) {
+  if (!dateStr) return null;
+  const normalized = typeof dateStr === 'string' ? dateStr.split('T')[0] : dateStr;
+  const config = CAL_CONFIG[typeKey];
+  const d = new Date(normalized + 'T00:00:00');
+  const mm = d.getMonth() + 1;
+  const dd = d.getDate();
+  const endLabel = `${mm}/${dd}`;
+  let actionMonth = d.getMonth();
+  if (actionMonth === 0) actionMonth = 12;
+  const preDate = getPreNoticeDate(normalized);
+  const preDateObj = new Date(preDate + 'T00:00:00');
+  const preDateLabel = `${preDateObj.getMonth() + 1}/${preDateObj.getDate()}`;
+
+  return {
+    pre: {
+      date: preDateLabel,
+      title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${actionMonth}月 ${config.preAction})`,
+    },
+    day: {
+      date: `${mm}/${dd}`,
+      title: `【${config.label}】${userName} ${config.dayAction}`,
+    },
+  };
+}
+
 // ============================================================
 // DaysBadge
 // ============================================================
@@ -68,6 +110,37 @@ function DaysBadge({ days }) {
       whiteSpace: 'nowrap' }}>
       {status === 'expired' ? `${Math.abs(days)}日超過` : `あと${days}日`}
     </span>
+  );
+}
+
+// ============================================================
+// CalendarPreview: カレンダー登録文言プレビュー
+// ============================================================
+function CalendarPreview({ typeKey, userName, dateStr }) {
+  const titles = buildCalendarTitles(typeKey, userName, dateStr);
+  if (!titles) return null;
+
+  return (
+    <div style={{ marginTop: '6px', padding: '8px 10px', background: '#FFFBEB',
+      borderRadius: '8px', border: '1px solid #FDE68A' }}>
+      <p style={{ margin: 0, fontSize: '10px', fontWeight: 600, color: '#92400E', marginBottom: '4px' }}>
+        📅 カレンダー登録予定
+      </p>
+      <div style={{ fontSize: '11px', color: '#78350F', lineHeight: 1.6 }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E',
+            fontWeight: 600 }}>{titles.pre.date}</span>
+          <span style={{ wordBreak: 'break-all' }}>{titles.pre.title}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '3px' }}>
+          <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E',
+            fontWeight: 600 }}>{titles.day.date}</span>
+          <span style={{ wordBreak: 'break-all' }}>{titles.day.title}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -163,7 +236,7 @@ function DeadlineForm({ client, onSave, onClose, pin }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#fff',
         borderRadius: '20px 20px 0 0', padding: '24px 20px 32px',
-        maxHeight: '80vh', overflow: 'auto' }}>
+        maxHeight: '85vh', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>期限設定</h2>
@@ -185,6 +258,9 @@ function DeadlineForm({ client, onSave, onClose, pin }) {
               style={{ width: '100%', padding: '12px', fontSize: '15px',
                 border: '1.5px solid #E2E8F0', borderRadius: '10px', outline: 'none',
                 boxSizing: 'border-box', color: '#1E293B' }} />
+            {form[dt.key] && (
+              <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />
+            )}
           </div>
         ))}
 
@@ -517,13 +593,15 @@ export default function KigenKanri() {
                   {isExpanded && (
                     <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1F5F9' }}>
                       {deadlines.map(dl => (
-                        <div key={dl.key} style={{ display: 'flex', justifyContent: 'space-between',
-                          alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F8FAFC' }}>
-                          <div>
-                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>{dl.label}</span>
-                            <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{formatDate(dl.date)}</span>
+                        <div key={dl.key} style={{ padding: '10px 0', borderBottom: '1px solid #F8FAFC' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>{dl.label}</span>
+                              <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{formatDate(dl.date)}</span>
+                            </div>
+                            <DaysBadge days={dl.days} />
                           </div>
-                          <DaysBadge days={dl.days} />
+                          <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />
                         </div>
                       ))}
                       <button onClick={() => setEditClient(client)}
