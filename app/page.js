@@ -76,7 +76,6 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   };
 }
 
-// 利用者の最悪ステータスを取得
 function getWorstStatus(client) {
   const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
   let worst = null;
@@ -89,7 +88,6 @@ function getWorstStatus(client) {
   return worst;
 }
 
-// フィルタ条件にステータスが合うか
 function matchesFilter(status, filter) {
   if (filter === 'attention') return status !== null && status !== 'safe';
   return status === filter;
@@ -236,7 +234,6 @@ export default function KigenKanri() {
   const [pin, setPin] = useState(null);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [activeFilter, setActiveFilter] = useState('attention');
   const [expandedClient, setExpandedClient] = useState(null);
   const [editClient, setEditClient] = useState(null);
@@ -273,9 +270,9 @@ export default function KigenKanri() {
   const allDeadlines = useMemo(() => {
     return filteredClients.flatMap(client =>
       DEADLINE_TYPES.map(dt => ({
-        clientId: client.id, clientName: client.name, careManager: client.care_manager,
-        typeKey: dt.key, typeLabel: dt.label, typeShort: dt.short,
-        date: client[dt.key], days: getDaysUntil(client[dt.key]),
+        clientId: client.id, clientName: client.name,
+        typeKey: dt.key, date: client[dt.key],
+        days: getDaysUntil(client[dt.key]),
         status: getStatus(getDaysUntil(client[dt.key])),
       }))
     );
@@ -288,27 +285,13 @@ export default function KigenKanri() {
     return counts;
   }, [allDeadlines]);
 
-  // ダッシュボード用: 期限単位でフィルタ
-  const filteredDeadlines = useMemo(() => {
-    let items = allDeadlines.filter(d => d.days !== null);
-    if (activeFilter === 'attention') items = items.filter(d => d.status !== 'safe');
-    else items = items.filter(d => d.status === activeFilter);
-    return items.sort((a, b) => a.days - b.days);
-  }, [allDeadlines, activeFilter]);
-
-  // 利用者別用: 利用者の最悪ステータスでフィルタ＋ソート
   const filteredSortedClients = useMemo(() => {
     const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
-    let list = filteredClients.map(client => ({
-      ...client,
-      worstStatus: getWorstStatus(client),
-    }));
-    // フィルタ適用: 利用者の最悪ステータスがフィルタ条件に合うか
+    let list = filteredClients.map(client => ({ ...client, worstStatus: getWorstStatus(client) }));
     list = list.filter(c => {
-      if (c.worstStatus === null) return activeFilter === 'attention'; // 未設定は要注意に含める
+      if (c.worstStatus === null) return activeFilter === 'attention';
       return matchesFilter(c.worstStatus, activeFilter);
     });
-    // 緊急度順ソート
     list.sort((a, b) => {
       const ap = a.worstStatus === null ? 99 : (priority[a.worstStatus] ?? 5);
       const bp = b.worstStatus === null ? 99 : (priority[b.worstStatus] ?? 5);
@@ -361,15 +344,6 @@ export default function KigenKanri() {
             </select>
           </div>
         )}
-        <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }}>
-          {[{ key: 'dashboard', label: 'ダッシュボード' }, { key: 'clients', label: '利用者別' }].map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              flex: 1, padding: '8px', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              background: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : 'transparent',
-              color: activeTab === tab.key ? '#fff' : 'rgba(255,255,255,0.6)',
-            }}>{tab.label}</button>
-          ))}
-        </div>
       </div>
 
       <div style={{ padding: '12px 16px 8px', display: 'flex', gap: '6px', overflowX: 'auto' }}>
@@ -397,98 +371,62 @@ export default function KigenKanri() {
       )}
 
       <div style={{ padding: '4px 16px 100px' }}>
-        {activeTab === 'dashboard' ? (
-          <>
-            <p style={{ fontSize: '11px', color: '#94A3B8', margin: '8px 0', fontWeight: 500 }}>
-              {filteredDeadlines.length}件の期限 — 期限が近い順
-            </p>
-            {filteredDeadlines.map((d) => {
-              const info = d.status ? STATUS_CONFIG[d.status] : { color: '#94A3B8' };
-              return (
-                <div key={`${d.clientId}-${d.typeKey}`}
-                  onClick={() => setEditClient(clients.find(c => c.id === d.clientId))}
-                  style={{ background: '#fff', borderRadius: '12px', padding: '14px 16px',
-                    marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                    borderLeft: `4px solid ${info.color}`, display: 'flex',
-                    justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700 }}>{d.clientName}</span>
-                      <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: '#F1F5F9', color: '#475569', fontWeight: 600 }}>{d.typeShort}</span>
-                    </div>
-                    <span style={{ fontSize: '12px', color: '#64748B' }}>{formatDate(d.date)}</span>
-                    {d.careManager && <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{d.careManager}</span>}
-                  </div>
-                  <DaysBadge days={d.days} />
-                </div>
-              );
-            })}
-            {filteredDeadlines.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '14px', marginTop: '40px' }}>
-                {activeFilter === 'attention' ? '要注意の期限はありません' : '該当する期限はありません'}
-              </p>
-            )}
-          </>
-        ) : (
-          <>
-            <p style={{ fontSize: '11px', color: '#94A3B8', margin: '8px 0', fontWeight: 500 }}>
-              {filteredSortedClients.length}名 — 緊急度順
-            </p>
-            {filteredSortedClients.map(client => {
-              const deadlines = DEADLINE_TYPES.map(dt => ({
-                ...dt, date: client[dt.key],
-                days: getDaysUntil(client[dt.key]),
-                status: getStatus(getDaysUntil(client[dt.key])),
-              }));
-              const worstInfo = client.worstStatus ? STATUS_CONFIG[client.worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
-              const isExpanded = expandedClient === client.id;
+        <p style={{ fontSize: '11px', color: '#94A3B8', margin: '8px 0', fontWeight: 500 }}>
+          {filteredSortedClients.length}名 — 緊急度順
+        </p>
+        {filteredSortedClients.map(client => {
+          const deadlines = DEADLINE_TYPES.map(dt => ({
+            ...dt, date: client[dt.key],
+            days: getDaysUntil(client[dt.key]),
+            status: getStatus(getDaysUntil(client[dt.key])),
+          }));
+          const worstInfo = client.worstStatus ? STATUS_CONFIG[client.worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
+          const isExpanded = expandedClient === client.id;
 
-              return (
-                <div key={client.id} style={{ background: '#fff', borderRadius: '12px',
-                  marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                  borderLeft: `4px solid ${worstInfo.color}`, overflow: 'hidden' }}>
-                  <div onClick={() => setExpandedClient(isExpanded ? null : client.id)}
-                    style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex',
-                      justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 700 }}>{client.name}</span>
-                        <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '10px',
-                          background: worstInfo.bg, color: worstInfo.color, fontWeight: 600,
-                          border: `1px solid ${worstInfo.color}22` }}>{worstInfo.label}</span>
-                      </div>
-                      {client.care_manager && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' }}>担当: {client.care_manager}</p>}
-                    </div>
-                    <span style={{ fontSize: '16px', color: '#94A3B8',
-                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+          return (
+            <div key={client.id} style={{ background: '#fff', borderRadius: '12px',
+              marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              borderLeft: `4px solid ${worstInfo.color}`, overflow: 'hidden' }}>
+              <div onClick={() => setExpandedClient(isExpanded ? null : client.id)}
+                style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex',
+                  justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700 }}>{client.name}</span>
+                    <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '10px',
+                      background: worstInfo.bg, color: worstInfo.color, fontWeight: 600,
+                      border: `1px solid ${worstInfo.color}22` }}>{worstInfo.label}</span>
                   </div>
-                  {isExpanded && (
-                    <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1F5F9' }}>
-                      {deadlines.map(dl => (
-                        <div key={dl.key} style={{ padding: '10px 0', borderBottom: '1px solid #F8FAFC' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>{dl.label}</span>
-                              <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{formatDate(dl.date)}</span>
-                            </div>
-                            <DaysBadge days={dl.days} />
-                          </div>
-                          <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />
-                        </div>
-                      ))}
-                      <button onClick={() => setEditClient(client)}
-                        style={{ width: '100%', padding: '10px', marginTop: '10px', fontSize: '13px',
-                          fontWeight: 600, background: '#F1F5F9', color: '#475569', border: 'none',
-                          borderRadius: '10px', cursor: 'pointer' }}>期限を編集</button>
-                    </div>
-                  )}
+                  {client.care_manager && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' }}>担当: {client.care_manager}</p>}
                 </div>
-              );
-            })}
-            {filteredSortedClients.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '14px', marginTop: '40px' }}>該当する利用者はいません</p>
-            )}
-          </>
+                <span style={{ fontSize: '16px', color: '#94A3B8',
+                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+              </div>
+              {isExpanded && (
+                <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1F5F9' }}>
+                  {deadlines.map(dl => (
+                    <div key={dl.key} style={{ padding: '10px 0', borderBottom: '1px solid #F8FAFC' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>{dl.label}</span>
+                          <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '8px' }}>{formatDate(dl.date)}</span>
+                        </div>
+                        <DaysBadge days={dl.days} />
+                      </div>
+                      <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />
+                    </div>
+                  ))}
+                  <button onClick={() => setEditClient(client)}
+                    style={{ width: '100%', padding: '10px', marginTop: '10px', fontSize: '13px',
+                      fontWeight: 600, background: '#F1F5F9', color: '#475569', border: 'none',
+                      borderRadius: '10px', cursor: 'pointer' }}>期限を編集</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filteredSortedClients.length === 0 && (
+          <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '14px', marginTop: '40px' }}>該当する利用者はいません</p>
         )}
       </div>
 
