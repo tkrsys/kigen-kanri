@@ -5,10 +5,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 // 定数
 // ============================================================
 const STATUS_CONFIG = {
-  expired:  { label: '期限切れ', color: '#DC2626', bg: '#FEF2F2' },
+  expired:  { label: '期限切', color: '#DC2626', bg: '#FEF2F2' },
   warning:  { label: '30日以内', color: '#EA580C', bg: '#FFF7ED' },
   caution:  { label: '75日以内', color: '#CA8A04', bg: '#FEFCE8' },
-  safe:     { label: '余裕あり', color: '#16A34A', bg: '#F0FDF4' },
+  safe:     { label: '余裕', color: '#16A34A', bg: '#F0FDF4' },
 };
 
 const DEADLINE_TYPES = [
@@ -74,7 +74,6 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   const mm = d.getMonth() + 1;
   const dd = d.getDate();
   const endLabel = `${mm}/${dd}`;
-  // アクション月 = 前月（0-indexedのgetMonth()がそのまま前月の値）
   let actionMonth = d.getMonth();
   if (actionMonth === 0) actionMonth = 12;
   const preDate = getPreNoticeDate(normalized);
@@ -297,14 +296,12 @@ export default function KigenKanri() {
   const [editClient, setEditClient] = useState(null);
   const [managerFilter, setManagerFilter] = useState('all');
 
-  // PIN復元
   useEffect(() => {
     const saved = localStorage.getItem('kigen-pin');
     if (saved) setPin(saved);
     else setLoading(false);
   }, []);
 
-  // データ取得
   const fetchClients = useCallback(async (p) => {
     setLoading(true);
     try {
@@ -326,13 +323,11 @@ export default function KigenKanri() {
     if (pin) fetchClients(pin);
   }, [pin, fetchClients]);
 
-  // ケアマネ一覧（フィルタ用）
   const managers = useMemo(() => {
     const set = new Set(clients.map(c => c.care_manager).filter(Boolean));
     return Array.from(set).sort();
   }, [clients]);
 
-  // フィルタ済みクライアント
   const filteredClients = useMemo(() => {
     let list = clients;
     if (managerFilter !== 'all') {
@@ -341,7 +336,6 @@ export default function KigenKanri() {
     return list;
   }, [clients, managerFilter]);
 
-  // 全期限一覧
   const allDeadlines = useMemo(() => {
     return filteredClients.flatMap(client =>
       DEADLINE_TYPES.map(dt => ({
@@ -358,7 +352,6 @@ export default function KigenKanri() {
     );
   }, [filteredClients]);
 
-  // サマリー
   const summary = useMemo(() => {
     const counts = { expired: 0, warning: 0, caution: 0, safe: 0, unset: 0 };
     allDeadlines.forEach(d => {
@@ -368,7 +361,6 @@ export default function KigenKanri() {
     return counts;
   }, [allDeadlines]);
 
-  // フィルタ済み・ソート済み期限
   const filteredDeadlines = useMemo(() => {
     let items = allDeadlines.filter(d => d.days !== null);
     if (activeFilter !== 'all') {
@@ -377,7 +369,6 @@ export default function KigenKanri() {
     return items.sort((a, b) => a.days - b.days);
   }, [allDeadlines, activeFilter]);
 
-  // 利用者別: 最悪ステータスでソート
   const sortedClients = useMemo(() => {
     const priority = { expired: 0, warning: 1, caution: 2, safe: 3 };
     return [...filteredClients].sort((a, b) => {
@@ -395,23 +386,19 @@ export default function KigenKanri() {
     });
   }, [filteredClients]);
 
-  // 保存後の更新
   const handleSave = (updatedClient) => {
     setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
     setEditClient(null);
   };
 
-  // ログアウト
   const handleLogout = () => {
     localStorage.removeItem('kigen-pin');
     setPin(null);
     setClients([]);
   };
 
-  // PIN未認証
   if (!pin) return <PinScreen onAuth={p => setPin(p)} />;
 
-  // ローディング
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center',
       minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif", color: '#64748B' }}>
@@ -421,10 +408,10 @@ export default function KigenKanri() {
 
   const FILTER_ITEMS = [
     { key: 'all', label: '全て', count: allDeadlines.filter(d => d.days !== null).length, color: '#1E3A5F' },
-    { key: 'expired', ...STATUS_CONFIG.expired, count: summary.expired },
-    { key: 'warning', ...STATUS_CONFIG.warning, count: summary.warning },
-    { key: 'caution', ...STATUS_CONFIG.caution, count: summary.caution },
-    { key: 'safe', ...STATUS_CONFIG.safe, count: summary.safe },
+    { key: 'expired', label: '期限切', color: STATUS_CONFIG.expired.color, bg: STATUS_CONFIG.expired.bg, count: summary.expired },
+    { key: 'warning', label: '30日以内', color: STATUS_CONFIG.warning.color, bg: STATUS_CONFIG.warning.bg, count: summary.warning },
+    { key: 'caution', label: '75日以内', color: STATUS_CONFIG.caution.color, bg: STATUS_CONFIG.caution.bg, count: summary.caution },
+    { key: 'safe', label: '余裕', color: STATUS_CONFIG.safe.color, bg: STATUS_CONFIG.safe.bg, count: summary.safe },
   ];
 
   return (
@@ -447,7 +434,6 @@ export default function KigenKanri() {
             borderRadius: '8px', cursor: 'pointer' }}>ログアウト</button>
         </div>
 
-        {/* ケアマネフィルタ */}
         {managers.length > 1 && (
           <div style={{ marginTop: '12px' }}>
             <select value={managerFilter} onChange={e => setManagerFilter(e.target.value)}
@@ -462,7 +448,6 @@ export default function KigenKanri() {
           </div>
         )}
 
-        {/* タブ */}
         <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }}>
           {[
             { key: 'dashboard', label: 'ダッシュボード' },
@@ -504,7 +489,7 @@ export default function KigenKanri() {
               要対応: {summary.expired + summary.warning}件
             </p>
             <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>
-              期限切れ {summary.expired}件 ・ 30日以内 {summary.warning}件
+              期限切 {summary.expired}件 ・ 30日以内 {summary.warning}件
             </p>
           </div>
         </div>
@@ -616,7 +601,6 @@ export default function KigenKanri() {
         )}
       </div>
 
-      {/* 編集モーダル */}
       {editClient && (
         <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} />
       )}
