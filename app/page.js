@@ -17,7 +17,6 @@ const DEADLINE_TYPES = [
   { key: 'short_end', label: '短期期限', short: '短期' },
 ];
 
-// カレンダー書き込みタイトル生成用
 const CAL_CONFIG = {
   nintei_end: { label: '認定期限', preAction: '認定調査 ｱｾｽﾒﾝﾄ', dayAction: '担当者会議＋計画書交付' },
   long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', dayAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
@@ -56,12 +55,10 @@ function toInputDate(dateStr) {
   return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
 }
 
-// カレンダー予定タイトル生成（フロントエンド用）
-// 前々月25日 = getMonth() - 2
 function getPreNoticeDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   let year = d.getFullYear();
-  let month = d.getMonth() - 2; // 前々月
+  let month = d.getMonth() - 2;
   if (month < 0) { month += 12; year -= 1; }
   return `${year}-${String(month + 1).padStart(2, '0')}-25`;
 }
@@ -113,7 +110,7 @@ function DaysBadge({ days }) {
 }
 
 // ============================================================
-// CalendarPreview: カレンダー登録文言プレビュー
+// CalendarPreview
 // ============================================================
 function CalendarPreview({ typeKey, userName, dateStr }) {
   const titles = buildCalendarTitles(typeKey, userName, dateStr);
@@ -291,7 +288,7 @@ export default function KigenKanri() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('attention');
   const [expandedClient, setExpandedClient] = useState(null);
   const [editClient, setEditClient] = useState(null);
   const [managerFilter, setManagerFilter] = useState('all');
@@ -358,12 +355,16 @@ export default function KigenKanri() {
       if (d.status === null) counts.unset++;
       else counts[d.status]++;
     });
+    counts.attention = counts.expired + counts.warning + counts.caution;
     return counts;
   }, [allDeadlines]);
 
   const filteredDeadlines = useMemo(() => {
     let items = allDeadlines.filter(d => d.days !== null);
-    if (activeFilter !== 'all') {
+    if (activeFilter === 'attention') {
+      // 余裕以外 = 期限切 + 30日以内 + 75日以内
+      items = items.filter(d => d.status !== 'safe');
+    } else if (activeFilter !== 'all') {
       items = items.filter(d => d.status === activeFilter);
     }
     return items.sort((a, b) => a.days - b.days);
@@ -407,18 +408,18 @@ export default function KigenKanri() {
   );
 
   const FILTER_ITEMS = [
+    { key: 'attention', label: '要注意', count: summary.attention, color: '#B45309' },
     { key: 'all', label: '全て', count: allDeadlines.filter(d => d.days !== null).length, color: '#1E3A5F' },
-    { key: 'expired', label: '期限切', color: STATUS_CONFIG.expired.color, bg: STATUS_CONFIG.expired.bg, count: summary.expired },
-    { key: 'warning', label: '30日以内', color: STATUS_CONFIG.warning.color, bg: STATUS_CONFIG.warning.bg, count: summary.warning },
-    { key: 'caution', label: '75日以内', color: STATUS_CONFIG.caution.color, bg: STATUS_CONFIG.caution.bg, count: summary.caution },
-    { key: 'safe', label: '余裕', color: STATUS_CONFIG.safe.color, bg: STATUS_CONFIG.safe.bg, count: summary.safe },
+    { key: 'expired', label: '期限切', color: STATUS_CONFIG.expired.color, count: summary.expired },
+    { key: 'warning', label: '30日以内', color: STATUS_CONFIG.warning.color, count: summary.warning },
+    { key: 'caution', label: '75日以内', color: STATUS_CONFIG.caution.color, count: summary.caution },
+    { key: 'safe', label: '余裕', color: STATUS_CONFIG.safe.color, count: summary.safe },
   ];
 
   return (
     <div style={{ fontFamily: "'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif",
       maxWidth: '480px', margin: '0 auto', backgroundColor: '#F8FAFC', minHeight: '100vh', color: '#1E293B' }}>
 
-      {/* ヘッダー */}
       <div style={{ background: 'linear-gradient(135deg, #1E3A5F 0%, #2D5A87 100%)',
         padding: '20px 16px 16px', color: '#fff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -463,7 +464,6 @@ export default function KigenKanri() {
         </div>
       </div>
 
-      {/* フィルタバー */}
       <div style={{ padding: '12px 16px 8px', display: 'flex', gap: '6px', overflowX: 'auto' }}>
         {FILTER_ITEMS.map(item => (
           <button key={item.key} onClick={() => setActiveFilter(item.key)} style={{
@@ -478,7 +478,6 @@ export default function KigenKanri() {
         ))}
       </div>
 
-      {/* アラートバナー */}
       {(summary.expired > 0 || summary.warning > 0) && (
         <div style={{ margin: '8px 16px', padding: '12px 16px', borderRadius: '12px',
           background: 'linear-gradient(135deg, #FEF2F2, #FFF7ED)',
@@ -495,7 +494,6 @@ export default function KigenKanri() {
         </div>
       )}
 
-      {/* コンテンツ */}
       <div style={{ padding: '4px 16px 100px' }}>
         {activeTab === 'dashboard' ? (
           <>
@@ -528,7 +526,9 @@ export default function KigenKanri() {
             })}
             {filteredDeadlines.length === 0 && (
               <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '14px', marginTop: '40px' }}>
-                {activeFilter === 'all' ? '期限データがありません。利用者別タブで期限を設定してください。' : '該当する期限はありません'}
+                {activeFilter === 'attention' ? '要注意の期限はありません' :
+                 activeFilter === 'all' ? '期限データがありません。利用者別タブで期限を設定してください。' :
+                 '該当する期限はありません'}
               </p>
             )}
           </>
