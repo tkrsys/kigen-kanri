@@ -277,7 +277,7 @@ export default function KigenKanri() {
 
   return (
     <div style={{ fontFamily:"'Noto Sans JP', sans-serif", background:T.bg, minHeight:'100vh', color:T.text }}>
-      <div style={{ maxWidth:480, margin:'0 auto', padding:'24px 16px 100px' }}>
+      <div style={{ maxWidth:880, margin:'0 auto', padding:'24px 16px 100px' }}>
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, paddingBottom:16, borderBottom:'2px solid #2d5a7b' }}>
           <div>
