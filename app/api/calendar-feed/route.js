@@ -15,23 +15,17 @@ import { generateIcalFeed } from '@/lib/ical-generator';
  *   CALENDAR_FEED_TOKEN — フィードアクセス用トークン（必須）
  */
 
-function checkToken(request) {
-  const url = new URL(request.url);
-  const token = url.searchParams.get('token') || '';
-  const validToken = process.env.CALENDAR_FEED_TOKEN || '';
-  if (!validToken) return false; // トークン未設定の場合はアクセス拒否
-  return token === validToken;
-}
-
 export async function GET(request) {
-  if (!checkToken(request)) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
   try {
     const url = new URL(request.url);
-    const manager = url.searchParams.get('manager');
+    const token = url.searchParams.get('token') || '';
+    const validToken = process.env.CALENDAR_FEED_TOKEN || '';
 
+    if (!validToken || token !== validToken) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    const manager = url.searchParams.get('manager');
     const sql = getDb();
 
     let clients;
@@ -84,6 +78,7 @@ export async function GET(request) {
       },
     });
   } catch (error) {
-    return new Response('Internal Server Error', { status: 500 });
+    console.error('calendar-feed error:', error);
+    return new Response('Internal Server Error: ' + error.message, { status: 500 });
   }
 }
