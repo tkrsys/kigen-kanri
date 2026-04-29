@@ -2,10 +2,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
 const STATUS_CONFIG = {
-  expired:  { label: '期限切', color: '#DC2626', bg: '#FEF2F2' },
+  expired:  { label: '期限切れ', color: '#DC2626', bg: '#FEF2F2' },
   warning:  { label: '30日以内', color: '#EA580C', bg: '#FFF7ED' },
-  caution:  { label: '75日以内', color: '#CA8A04', bg: '#FEFCE8' },
-  safe:     { label: '余裕', color: '#16A34A', bg: '#F0FDF4' },
+  caution:  { label: '要注意', color: '#CA8A04', bg: '#FEFCE8' },
+  safe:     { label: '余裕あり', color: '#16A34A', bg: '#F0FDF4' },
 };
 
 const DEADLINE_TYPES = [
@@ -313,12 +313,12 @@ export default function KigenKanri() {
       minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif", color: '#64748B' }}>読み込み中...</div>
   );
 
+  // 配置順: 余裕あり → 要注意 → 30日以内 → 期限切れ
   const FILTER_ITEMS = [
+    { key: 'safe', label: '余裕あり', color: STATUS_CONFIG.safe.color, count: summary.safe },
     { key: 'attention', label: '要注意', count: summary.attention, color: '#B45309' },
-    { key: 'expired', label: '期限切', color: STATUS_CONFIG.expired.color, count: summary.expired },
     { key: 'warning', label: '30日以内', color: STATUS_CONFIG.warning.color, count: summary.warning },
-    { key: 'caution', label: '75日以内', color: STATUS_CONFIG.caution.color, count: summary.caution },
-    { key: 'safe', label: '余裕', color: STATUS_CONFIG.safe.color, count: summary.safe },
+    { key: 'expired', label: '期限切れ', color: STATUS_CONFIG.expired.color, count: summary.expired },
   ];
 
   return (
@@ -365,7 +365,7 @@ export default function KigenKanri() {
           <span style={{ fontSize: '24px' }}>⚠️</span>
           <div>
             <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#DC2626' }}>要対応: {summary.expired + summary.warning}件</p>
-            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>期限切 {summary.expired}件 ・ 30日以内 {summary.warning}件</p>
+            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#92400E' }}>期限切れ {summary.expired}件 ・ 30日以内 {summary.warning}件</p>
           </div>
         </div>
       )}
