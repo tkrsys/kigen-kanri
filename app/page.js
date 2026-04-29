@@ -42,14 +42,16 @@ const T = { bg:'#f5f3ee', accent:'#2d5a7b', text:'#1a1a2e', sub:'#4a4a5a', muted
   btnGear:{padding:'6px 10px',background:'transparent',color:'#8888a0',border:'1px solid #d8d8d0',borderRadius:6,cursor:'pointer',display:'flex',alignItems:'center'},
 };
 const GearIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8888a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
+const EyeIcon = ({show}) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8888a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{show?<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>:<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></>}</svg>;
 
 function DaysBadge({days}){if(days===null)return<span style={{fontSize:11,color:T.muted,padding:'2px 8px',borderRadius:4,background:'#eceae3'}}>未設定</span>;const s=getStatus(days),c=STATUS_CONFIG[s];return<span style={{fontSize:11,fontWeight:600,color:c.color,background:c.bg,padding:'2px 8px',borderRadius:4}}>{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>;}
 function DeadlineSummaryInline({days,label}){if(days===null)return<span style={{fontSize:12,color:T.muted}}>{label}:未設定</span>;const s=getStatus(days),c=STATUS_CONFIG[s];return<span style={{fontSize:12,color:c.color,fontWeight:600}}>{label}:{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>;}
 function CalendarPreview({typeKey,userName,dateStr}){const titles=buildCalendarTitles(typeKey,userName,dateStr);if(!titles)return null;return(<div style={{marginTop:6,padding:'8px 12px',background:'#fafaf8',borderRadius:6,border:'1px solid #d8d8d0'}}><p style={{margin:0,fontSize:10,fontWeight:600,color:T.accent,marginBottom:4}}>📅 登録情報</p><div style={{fontSize:11,color:T.sub,lineHeight:1.6}}>{[titles.pre,titles.mid,titles.day].map((t,i)=>(<div key={i} style={{display:'flex',gap:6,alignItems:'flex-start',marginTop:i?3:0}}><span style={{flexShrink:0,fontSize:10,padding:'1px 6px',borderRadius:4,background:'#eceae3',color:T.sub,fontWeight:600}}>{t.date}</span><span style={{wordBreak:'break-all'}}>{t.title}</span></div>))}</div></div>);}
 
-function PinScreen({onAuth}){const[pin,setPin]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);
-  const submit=async()=>{setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){localStorage.setItem('kigen-pin',pin);onAuth(pin);}else setError('PINが正しくありません');}catch{setError('接続エラー');}setLoading(false);};
-  return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>期限管理システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type="password" inputMode="numeric" maxLength={6} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,''));setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',letterSpacing:8}}/></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading||!pin} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading||!pin?0.5:1}}>{loading?'確認中...':'ログイン'}</button></div></div>);}
+function PinScreen({onAuth}){
+  const[pin,setPin]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[showPin,setShowPin]=useState(false);
+  const submit=async()=>{if(!pin.trim()){setError('パスワードを入力してください');return;}setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){localStorage.setItem('kigen-pin',pin);onAuth(pin);}else setError('パスワードが正しくありません');}catch{setError('接続エラー');}setLoading(false);};
+  return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>期限管理システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type={showPin?'text':'password'} value={pin} onChange={e=>{setPin(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',padding:'0 40px 0 0'}}/><button type="button" onMouseDown={()=>setShowPin(true)} onMouseUp={()=>setShowPin(false)} onMouseLeave={()=>setShowPin(false)} onTouchStart={()=>setShowPin(true)} onTouchEnd={()=>setShowPin(false)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center'}}><EyeIcon show={showPin}/></button></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading?0.5:1}}>{loading?'認証中...':'ログイン'}</button></div></div>);}
 
 function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
   const[form,setForm]=useState({nintei_end:toInputDate(client.nintei_end),long_end:toInputDate(client.long_end),short_end:toInputDate(client.short_end)});
@@ -98,7 +100,6 @@ export default function KigenKanri(){
     {key:'unset',label:'未登録',color:T.muted,count:summary.unset},
   ];
 
-  // Gear dropdown (careplan-delivery統一)
   const gearMenu = (
     <div ref={gearRef} style={{position:'relative'}}>
       <button onClick={()=>setShowGearMenu(!showGearMenu)} style={T.btnGear}><GearIcon/></button>
@@ -111,7 +112,6 @@ export default function KigenKanri(){
     </div>
   );
 
-  // カレンダー連携設定画面
   if(mode==='calendarSync'){
     return(
       <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
@@ -148,7 +148,6 @@ export default function KigenKanri(){
     );
   }
 
-  // メイン一覧画面
   return(
     <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
