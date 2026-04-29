@@ -108,7 +108,6 @@ function getWorstStatus(client) {
   return worst;
 }
 
-/** カレンダープレビューを表示すべき期限キーを返す（重複排除済み） */
 function getVisibleCalendarKeys(client) {
   const nintei = normalizeClientDate(client.nintei_end);
   const long = normalizeClientDate(client.long_end);
@@ -185,7 +184,8 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
   );
 }
 
-function SettingsModal({ managers, calSyncMap, onToggle, onClose }) {
+function SettingsModal({ manager, calSyncMap, onToggle, onClose }) {
+  const isSynced = !!calSyncMap[manager];
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100,
@@ -200,26 +200,22 @@ function SettingsModal({ managers, calSyncMap, onToggle, onClose }) {
         <div style={{ marginBottom: '16px' }}>
           <p style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600, color: '#334155' }}>Googleカレンダー同期</p>
           <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>
-            ☑のケアマネの担当利用者の期限予定がGoogleカレンダーに自動同期されます。
+            ☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {managers.map(m => (
-              <label key={m} style={{ display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '12px 14px', borderRadius: '10px', cursor: 'pointer',
-                background: calSyncMap[m] ? '#EFF6FF' : '#F8FAFC',
-                border: `1.5px solid ${calSyncMap[m] ? '#93C5FD' : '#E2E8F0'}`,
-                transition: 'all 0.15s' }}>
-                <input type="checkbox" checked={!!calSyncMap[m]} onChange={() => onToggle(m)}
-                  style={{ accentColor: '#3B82F6', width: '18px', height: '18px', flexShrink: 0 }} />
-                <div>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>{m}</span>
-                  <span style={{ fontSize: '11px', color: calSyncMap[m] ? '#2563EB' : '#94A3B8', marginLeft: '8px' }}>
-                    {calSyncMap[m] ? '同期ON' : '同期OFF'}
-                  </span>
-                </div>
-              </label>
-            ))}
-          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '12px',
+            padding: '14px 16px', borderRadius: '10px', cursor: 'pointer',
+            background: isSynced ? '#EFF6FF' : '#F8FAFC',
+            border: `1.5px solid ${isSynced ? '#93C5FD' : '#E2E8F0'}`,
+            transition: 'all 0.15s' }}>
+            <input type="checkbox" checked={isSynced} onChange={() => onToggle(manager)}
+              style={{ accentColor: '#3B82F6', width: '18px', height: '18px', flexShrink: 0 }} />
+            <div>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>{manager}</span>
+              <span style={{ fontSize: '11px', color: isSynced ? '#2563EB' : '#94A3B8', marginLeft: '8px' }}>
+                {isSynced ? '同期ON' : '同期OFF'}
+              </span>
+            </div>
+          </label>
         </div>
       </div>
     </div>
@@ -273,8 +269,6 @@ function DeadlineForm({ client, onSave, onClose, pin, showCalendar }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  // 編集フォーム内でも重複排除
   const visibleCalKeys = useMemo(() => {
     const nintei = form.nintei_end || null;
     const long = form.long_end || null;
@@ -285,7 +279,6 @@ function DeadlineForm({ client, onSave, onClose, pin, showCalendar }) {
     if (short && !(nintei && nintei === short) && !(long && long === short)) keys.push('short_end');
     return keys;
   }, [form]);
-
   const handleSave = async () => {
     setSaving(true); setError('');
     try {
@@ -343,7 +336,7 @@ export default function KigenKanri() {
   const [editClient, setEditClient] = useState(null);
   const [managerFilter, setManagerFilter] = useState('all');
   const [calSyncMap, setCalSyncMap] = useState({});
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsManager, setSettingsManager] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('kigen-pin');
@@ -433,6 +426,16 @@ export default function KigenKanri() {
 
   const handleLogout = () => { localStorage.removeItem('kigen-pin'); setPin(null); setClients([]); };
 
+  const handleOpenSettings = () => {
+    if (managerFilter !== 'all') {
+      setSettingsManager(managerFilter);
+    } else if (managers.length === 1) {
+      setSettingsManager(managers[0]);
+    } else {
+      setSettingsManager(null);
+    }
+  };
+
   if (!pin) return <PinScreen onAuth={p => setPin(p)} />;
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center',
@@ -459,7 +462,7 @@ export default function KigenKanri() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <button onClick={() => setShowSettings(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '16px', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer' }}
+            <button onClick={handleOpenSettings} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '16px', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer' }}
               title="設定">⚙</button>
             <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '12px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>ログアウト</button>
           </div>
@@ -567,7 +570,7 @@ export default function KigenKanri() {
       </div>
 
       {editClient && <DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={() => setEditClient(null)} showCalendar={!!calSyncMap[editClient.care_manager]} />}
-      {showSettings && <SettingsModal managers={managers} calSyncMap={calSyncMap} onToggle={handleCalSyncToggle} onClose={() => setShowSettings(false)} />}
+      {settingsManager && <SettingsModal manager={settingsManager} calSyncMap={calSyncMap} onToggle={handleCalSyncToggle} onClose={() => setSettingsManager(null)} />}
     </div>
   );
 }
