@@ -78,12 +78,102 @@ function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
     {DEADLINE_TYPES.map(dt=>(<div key={dt.key} style={{marginBottom:16}}><label style={{display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6}}>{dt.label}</label><input type="date" value={form[dt.key]} onChange={e=>setForm({...form,[dt.key]:e.target.value})} style={{width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text}}/>{showCalendar&&form[dt.key]&&visibleCalKeys.includes(dt.key)&&<CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]}/>}</div>))}
     {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);}
 
+function RegisterScreen({pin,onBack,onRegistered,managers:managerList}){
+  const[name,setName]=useState('');const[careManager,setCareManager]=useState(managerList[0]||'');
+  const[ninteiEnd,setNinteiEnd]=useState('');const[longEnd,setLongEnd]=useState('');const[shortEnd,setShortEnd]=useState('');
+  const[saving,setSaving]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
+
+  useEffect(()=>{if(managerList.length>0&&!careManager)setCareManager(managerList[0]);},[managerList,careManager]);
+
+  const handleSubmit=async()=>{
+    if(!name.trim()){setError('利用者名を入力してください');return;}
+    if(!careManager){setError('担当ケアマネジャーを選択してください');return;}
+    setSaving(true);setError('');setSuccess('');
+    try{
+      const res=await fetch('/api/clients',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-pin':pin},
+        body:JSON.stringify({name:name.trim(),care_manager:careManager,nintei_end:ninteiEnd||null,long_end:longEnd||null,short_end:shortEnd||null})
+      });
+      if(res.ok){
+        const data=await res.json();
+        setSuccess(`${data.client.name} さんを登録しました`);
+        setName('');setNinteiEnd('');setLongEnd('');setShortEnd('');
+        onRegistered(data.client);
+      }else{
+        const data=await res.json();
+        setError(data.error||'登録に失敗しました');
+      }
+    }catch{setError('接続エラー');}
+    setSaving(false);
+  };
+
+  const inputStyle={width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text};
+  const labelStyle={display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6};
+
+  return(
+    <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
+      <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
+          <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <button onClick={onBack} style={T.btnBack}>← 戻る</button>
+          </div>
+        </div>
+
+        <div style={{fontWeight:700,fontSize:16,color:T.text,marginBottom:20}}>利用者登録</div>
+
+        <div style={T.card}>
+          <div style={{marginBottom:16}}>
+            <label style={labelStyle}>利用者名 <span style={{color:'#c0392b'}}>*</span></label>
+            <input type="text" value={name} onChange={e=>{setName(e.target.value);setError('');setSuccess('');}} placeholder="例：山田 太郎" style={inputStyle}/>
+          </div>
+
+          <div style={{marginBottom:16}}>
+            <label style={labelStyle}>担当ケアマネジャー <span style={{color:'#c0392b'}}>*</span></label>
+            <select value={careManager} onChange={e=>{setCareManager(e.target.value);setError('');setSuccess('');}} style={{...inputStyle,appearance:'auto'}}>
+              {managerList.map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+
+          <div style={{borderTop:'1px solid #eceae3',paddingTop:16,marginTop:8,marginBottom:16}}>
+            <div style={T.secTitle}><span style={T.barStyle}></span>期限設定（任意）</div>
+          </div>
+
+          <div style={{marginBottom:16}}>
+            <label style={labelStyle}>認定期限</label>
+            <input type="date" value={ninteiEnd} onChange={e=>setNinteiEnd(e.target.value)} style={inputStyle}/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={labelStyle}>長期期限</label>
+            <input type="date" value={longEnd} onChange={e=>setLongEnd(e.target.value)} style={inputStyle}/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={labelStyle}>短期期限</label>
+            <input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/>
+          </div>
+
+          {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}
+          {success&&<p style={{color:'#27766a',fontSize:13,margin:'8px 0',fontWeight:500}}>✓ {success}</p>}
+
+          <div style={{display:'flex',justifyContent:'flex-end',marginTop:20}}>
+            <button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button>
+          </div>
+        </div>
+
+        <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
+      </div>
+    </div>
+  );
+}
+
 export default function KigenKanri(){
   const[pin,setPin]=useState(null);const[clients,setClients]=useState([]);const[loading,setLoading]=useState(true);
   const[activeFilter,setActiveFilter]=useState('attention');const[expandedClient,setExpandedClient]=useState(null);
   const[editClient,setEditClient]=useState(null);const[managerFilter,setManagerFilter]=useState('all');
   const[calSyncMap,setCalSyncMap]=useState({});const[isAdmin,setIsAdmin]=useState(false);
   const[showGearMenu,setShowGearMenu]=useState(false);const[mode,setMode]=useState('list');
+  const[allManagers,setAllManagers]=useState([]);
   const gearRef=useRef(null);
 
   useEffect(()=>{const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);
@@ -95,6 +185,10 @@ export default function KigenKanri(){
   const fetchClients=useCallback(async(p)=>{setLoading(true);try{const res=await fetch('/api/clients',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setClients(data.clients||[]);const syncMap={};(data.clients||[]).forEach(c=>{if(c.care_manager)syncMap[c.care_manager]=!!c.calendar_sync;});setCalSyncMap(syncMap);if(data.role)localStorage.setItem('auth_role',data.role);setIsAdmin(data.role==='admin');}else if(res.status===401){localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');setPin(null);}}catch(e){console.error(e);}setLoading(false);},[]);
   useEffect(()=>{if(pin)fetchClients(pin);},[pin,fetchClients]);
 
+  // ケアマネ一覧取得（care_managersテーブルから）
+  const fetchManagers=useCallback(async(p)=>{try{const res=await fetch('/api/care-managers',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setAllManagers((data.managers||[]).map(m=>m.name));}}catch(e){console.error(e);}},[]);
+  useEffect(()=>{if(pin)fetchManagers(pin);},[pin,fetchManagers]);
+
   const handleCalSyncToggle=async(name)=>{const newVal=!calSyncMap[name];setCalSyncMap(prev=>({...prev,[name]:newVal}));try{await fetch('/api/care-managers',{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({manager_name:name,calendar_sync:newVal})});}catch(e){console.error(e);}};
 
   const managers=useMemo(()=>{const set=new Set(clients.map(c=>c.care_manager).filter(Boolean));return Array.from(set).sort();},[clients]);
@@ -105,9 +199,14 @@ export default function KigenKanri(){
   const handleSave=(updatedClient)=>{setClients(prev=>prev.map(c=>c.id===updatedClient.id?{...updatedClient,calendar_sync:c.calendar_sync}:c));setEditClient(null);};
   const handleLogout=()=>{setShowGearMenu(false);localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setIsAdmin(false);};
   const handleAuth=(p,role)=>{setPin(p);setIsAdmin(role==='admin');};
+  const handleRegistered=(newClient)=>{setClients(prev=>[...prev,newClient].sort((a,b)=>(a.name||'').localeCompare(b.name||'')));};
 
   if(!pin)return<PinScreen onAuth={handleAuth}/>;
   if(loading)return<div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif",color:T.muted}}>読み込み中...</div>;
+
+  if(mode==='register'){
+    return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers}/>;
+  }
 
   const FILTER_ITEMS=[
     {key:'safe',label:'余裕あり',color:STATUS_CONFIG.safe.color,count:summary.safe},
@@ -122,8 +221,9 @@ export default function KigenKanri(){
       <button onClick={()=>setShowGearMenu(!showGearMenu)} style={T.btnGear}><GearIcon/></button>
       {showGearMenu && (
         <div style={{position:'absolute',right:0,top:'100%',marginTop:4,background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,.12)',minWidth:180,zIndex:50,overflow:'hidden'}}>
-          <button onClick={handleLogout} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',borderBottom:'1px solid #f0f0f0',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>ログアウト</button>
-          {isAdmin && <button onClick={()=>{setShowGearMenu(false);setMode('calendarSync');}} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>カレンダー連携設定</button>}
+          {isAdmin && <button onClick={()=>{setShowGearMenu(false);setMode('register');}} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',borderBottom:'1px solid #f0f0f0',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>利用者登録</button>}
+          {isAdmin && <button onClick={()=>{setShowGearMenu(false);setMode('calendarSync');}} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',borderBottom:'1px solid #f0f0f0',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>カレンダー連携設定</button>}
+          <button onClick={handleLogout} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>ログアウト</button>
         </div>
       )}
     </div>
