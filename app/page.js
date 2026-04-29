@@ -201,7 +201,11 @@ export default function KigenKanri(){
   const filteredSortedClients=useMemo(()=>{const priority={expired:0,warning:1,caution:2,safe:3};let list=filteredClients.map(c=>({...c,worstStatus:getWorstStatus(c)}));list=list.filter(c=>clientMatchesFilter(c,activeFilter));list.sort((a,b)=>{const ap=a.worstStatus===null?99:(priority[a.worstStatus]??5);const bp=b.worstStatus===null?99:(priority[b.worstStatus]??5);return ap-bp;});return list;},[filteredClients,activeFilter]);
 
   const handleSave=(updatedClient)=>{setClients(prev=>prev.map(c=>c.id===updatedClient.id?{...updatedClient,calendar_sync:c.calendar_sync}:c));setEditClient(null);};
-  const handleLogout=()=>{setShowGearMenu(false);localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setIsAdmin(false);};
+  const handleLogout=()=>{
+    setShowGearMenu(false);
+    if(!window.confirm('ログアウトしなければ次回以降もログインは不要です。ログアウトしますか？'))return;
+    localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setIsAdmin(false);
+  };
   const handleAuth=(p,role)=>{setPin(p);setIsAdmin(role==='admin');};
   const handleRegistered=(newClient)=>{setClients(prev=>[...prev,newClient].sort((a,b)=>(a.name||'').localeCompare(b.name||'')));};
 
