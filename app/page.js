@@ -108,7 +108,6 @@ function getWorstStatus(client) {
   return worst;
 }
 
-/** 利用者が持つ全ステータスをセットで返す */
 function getClientStatuses(client) {
   const statuses = new Set();
   for (const dt of DEADLINE_TYPES) {
@@ -119,8 +118,12 @@ function getClientStatuses(client) {
   return statuses;
 }
 
-/** 利用者がフィルタに該当するか（期限のどれか1つでも該当すればtrue） */
+function hasAnyDeadline(client) {
+  return DEADLINE_TYPES.some(dt => client[dt.key]);
+}
+
 function clientMatchesFilter(client, filter) {
+  if (filter === 'unset') return !hasAnyDeadline(client);
   const statuses = getClientStatuses(client);
   if (statuses.size === 0) return false;
   if (filter === 'attention') {
@@ -357,7 +360,14 @@ export default function KigenKanri() {
   useEffect(() => {
     const saved = localStorage.getItem('kigen-pin');
     if (saved) setPin(saved); else setLoading(false);
+    const savedManager = localStorage.getItem('kigen-manager-filter');
+    if (savedManager) setManagerFilter(savedManager);
   }, []);
+
+  const handleManagerFilterChange = (val) => {
+    setManagerFilter(val);
+    localStorage.setItem('kigen-manager-filter', val);
+  };
 
   const fetchClients = useCallback(async (p) => {
     setLoading(true);
@@ -402,10 +412,10 @@ export default function KigenKanri() {
     return list;
   }, [clients, managerFilter]);
 
-  // 利用者単位でカウント（期限のどれか1つでも該当すればカウント）
   const summary = useMemo(() => {
-    const counts = { expired: 0, warning: 0, caution: 0, safe: 0, attention: 0 };
+    const counts = { expired: 0, warning: 0, caution: 0, safe: 0, attention: 0, unset: 0 };
     filteredClients.forEach(client => {
+      if (!hasAnyDeadline(client)) { counts.unset++; return; }
       const statuses = getClientStatuses(client);
       if (statuses.has('expired')) counts.expired++;
       if (statuses.has('warning')) counts.warning++;
@@ -456,6 +466,7 @@ export default function KigenKanri() {
     { key: 'attention', label: '要注意', count: summary.attention, color: '#B45309' },
     { key: 'warning', label: '30日以内', color: STATUS_CONFIG.warning.color, count: summary.warning },
     { key: 'expired', label: '期限切れ', color: STATUS_CONFIG.expired.color, count: summary.expired },
+    { key: 'unset', label: '未登録', color: '#64748B', count: summary.unset },
   ];
 
   return (
@@ -478,7 +489,7 @@ export default function KigenKanri() {
         </div>
         {managers.length > 1 && (
           <div style={{ marginTop: '12px' }}>
-            <select value={managerFilter} onChange={e => setManagerFilter(e.target.value)}
+            <select value={managerFilter} onChange={e => handleManagerFilterChange(e.target.value)}
               style={{ width: '100%', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff', outline: 'none', appearance: 'auto' }}>
               <option value="all" style={{ color: '#1E293B' }}>全ケアマネ</option>
               {managers.map(m => <option key={m} value={m} style={{ color: '#1E293B' }}>{m}</option>)}
