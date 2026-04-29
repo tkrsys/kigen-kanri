@@ -15,9 +15,9 @@ const DEADLINE_TYPES = [
 ];
 
 const CAL_CONFIG = {
-  nintei_end: { label: '認定期限', preAction: '認定調査 ｱｾｽﾒﾝﾄ', dayAction: '担当者会議＋計画書交付' },
-  long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', dayAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
-  short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', dayAction: '意見照会＋ﾌﾟﾗﾝ交付' },
+  nintei_end: { label: '認定期限', preAction: '認定調査 ｱｾｽﾒﾝﾄ', midAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
+  long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
+  short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: 'ﾌﾟﾗﾝ交付' },
 };
 
 function getDaysUntil(dateStr) {
@@ -49,12 +49,20 @@ function toInputDate(dateStr) {
   return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
 }
 
-function getPreNoticeDate(dateStr) {
+function getNoticeDateStr(dateStr, monthsBack) {
   const d = new Date(dateStr + 'T00:00:00');
   let year = d.getFullYear();
-  let month = d.getMonth() - 2;
+  let month = d.getMonth() - monthsBack;
   if (month < 0) { month += 12; year -= 1; }
   return `${year}-${String(month + 1).padStart(2, '0')}-25`;
+}
+
+function getActionMonth(dateStr, offset) {
+  const d = new Date(dateStr + 'T00:00:00');
+  let m = d.getMonth() + 1 + offset;
+  if (m <= 0) m += 12;
+  if (m > 12) m -= 12;
+  return m;
 }
 
 function buildCalendarTitles(typeKey, userName, dateStr) {
@@ -65,14 +73,25 @@ function buildCalendarTitles(typeKey, userName, dateStr) {
   const mm = d.getMonth() + 1;
   const dd = d.getDate();
   const endLabel = `${mm}/${dd}`;
-  let actionMonth = d.getMonth();
-  if (actionMonth === 0) actionMonth = 12;
-  const preDate = getPreNoticeDate(normalized);
+
+  const preDate = getNoticeDateStr(normalized, 2);
   const preDateObj = new Date(preDate + 'T00:00:00');
   const preDateLabel = `${preDateObj.getMonth() + 1}/${preDateObj.getDate()}`;
+  const preMonth = getActionMonth(normalized, -1);
+
+  const midDate = getNoticeDateStr(normalized, 1);
+  const midDateObj = new Date(midDate + 'T00:00:00');
+  const midDateLabel = `${midDateObj.getMonth() + 1}/${midDateObj.getDate()}`;
+  const midMonth = getActionMonth(normalized, 0);
+
+  const dayDate = getNoticeDateStr(normalized, 0);
+  const dayDateObj = new Date(dayDate + 'T00:00:00');
+  const dayDateLabel = `${dayDateObj.getMonth() + 1}/${dayDateObj.getDate()}`;
+
   return {
-    pre: { date: preDateLabel, title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${actionMonth}月 ${config.preAction})` },
-    day: { date: `${mm}/${dd}`, title: `【${config.label}】${userName} ${config.dayAction}` },
+    pre: { date: preDateLabel, title: `【${config.label} 2ヶ月前】${userName} ${endLabel}(${preMonth}月 ${config.preAction})` },
+    mid: { date: midDateLabel, title: `【${config.label} 1ヶ月前】${userName} ${endLabel}(${midMonth}月 ${config.midAction})` },
+    day: { date: dayDateLabel, title: `【${config.label}　　　　】${userName} ${endLabel}` },
   };
 }
 
@@ -124,6 +143,11 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
             borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.pre.date}</span>
           <span style={{ wordBreak: 'break-all' }}>{titles.pre.title}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '3px' }}>
+          <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
+            borderRadius: '4px', background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>{titles.mid.date}</span>
+          <span style={{ wordBreak: 'break-all' }}>{titles.mid.title}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '3px' }}>
           <span style={{ flexShrink: 0, fontSize: '10px', padding: '1px 6px',
@@ -313,7 +337,6 @@ export default function KigenKanri() {
       minHeight: '100vh', fontFamily: "'Noto Sans JP', sans-serif", color: '#64748B' }}>読み込み中...</div>
   );
 
-  // 配置順: 余裕あり → 要注意 → 30日以内 → 期限切れ
   const FILTER_ITEMS = [
     { key: 'safe', label: '余裕あり', color: STATUS_CONFIG.safe.color, count: summary.safe },
     { key: 'attention', label: '要注意', count: summary.attention, color: '#B45309' },
