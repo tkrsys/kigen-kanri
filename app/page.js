@@ -49,6 +49,11 @@ function toInputDate(dateStr) {
   return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
 }
 
+function normalizeClientDate(dateStr) {
+  if (!dateStr) return null;
+  return typeof dateStr === 'string' ? dateStr.split('T')[0] : dateStr;
+}
+
 function getNoticeDateStr(dateStr, monthsBack) {
   const d = new Date(dateStr + 'T00:00:00');
   let year = d.getFullYear();
@@ -103,6 +108,18 @@ function getWorstStatus(client) {
   return worst;
 }
 
+/** カレンダープレビューを表示すべき期限キーを返す（重複排除済み） */
+function getVisibleCalendarKeys(client) {
+  const nintei = normalizeClientDate(client.nintei_end);
+  const long = normalizeClientDate(client.long_end);
+  const short = normalizeClientDate(client.short_end);
+  const keys = [];
+  if (nintei) keys.push('nintei_end');
+  if (long && !(nintei && nintei === long)) keys.push('long_end');
+  if (short && !(nintei && nintei === short) && !(long && long === short)) keys.push('short_end');
+  return keys;
+}
+
 function matchesFilter(status, filter) {
   if (filter === 'attention') return status !== null && status !== 'safe';
   return status === filter;
@@ -145,7 +162,7 @@ function CalendarPreview({ typeKey, userName, dateStr }) {
     <div style={{ marginTop: '6px', padding: '8px 10px', background: '#FFFBEB',
       borderRadius: '8px', border: '1px solid #FDE68A' }}>
       <p style={{ margin: 0, fontSize: '10px', fontWeight: 600, color: '#92400E', marginBottom: '4px' }}>
-        📅 カレンダー登録予定
+        📅 登録情報
       </p>
       <div style={{ fontSize: '11px', color: '#78350F', lineHeight: 1.6 }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
@@ -256,6 +273,19 @@ function DeadlineForm({ client, onSave, onClose, pin, showCalendar }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // 編集フォーム内でも重複排除
+  const visibleCalKeys = useMemo(() => {
+    const nintei = form.nintei_end || null;
+    const long = form.long_end || null;
+    const short = form.short_end || null;
+    const keys = [];
+    if (nintei) keys.push('nintei_end');
+    if (long && !(nintei && nintei === long)) keys.push('long_end');
+    if (short && !(nintei && nintei === short) && !(long && long === short)) keys.push('short_end');
+    return keys;
+  }, [form]);
+
   const handleSave = async () => {
     setSaving(true); setError('');
     try {
@@ -289,7 +319,7 @@ function DeadlineForm({ client, onSave, onClose, pin, showCalendar }) {
             <input type="date" value={form[dt.key]}
               onChange={e => setForm({ ...form, [dt.key]: e.target.value })}
               style={{ width: '100%', padding: '12px', fontSize: '15px', border: '1.5px solid #E2E8F0', borderRadius: '10px', outline: 'none', boxSizing: 'border-box', color: '#1E293B' }} />
-            {showCalendar && form[dt.key] && <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />}
+            {showCalendar && form[dt.key] && visibleCalKeys.includes(dt.key) && <CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]} />}
           </div>
         ))}
         {error && <p style={{ color: '#DC2626', fontSize: '13px', margin: '8px 0' }}>{error}</p>}
@@ -482,6 +512,7 @@ export default function KigenKanri() {
           const worstInfo = client.worstStatus ? STATUS_CONFIG[client.worstStatus] : { color: '#94A3B8', bg: '#F1F5F9', label: '未設定' };
           const isExpanded = expandedClient === client.id;
           const showCalendar = !!calSyncMap[client.care_manager];
+          const visibleCalKeys = getVisibleCalendarKeys(client);
 
           return (
             <div key={client.id} style={{ background: '#fff', borderRadius: '12px',
@@ -518,7 +549,7 @@ export default function KigenKanri() {
                         </div>
                         <DaysBadge days={dl.days} />
                       </div>
-                      {showCalendar && <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />}
+                      {showCalendar && visibleCalKeys.includes(dl.key) && <CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date} />}
                     </div>
                   ))}
                   <button onClick={() => setEditClient(client)}
