@@ -252,6 +252,7 @@ export default function KigenKanri(){
   ];
 
   if(mode==='calendarSync'){
+    const calSyncManagers=managerFilter!=='all'?managers.filter(m=>m===managerFilter):managers;
     return(
       <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
         <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
@@ -265,13 +266,20 @@ export default function KigenKanri(){
               {gearMenu}
             </div>
           </div>
-          <div style={{fontSize:16,fontWeight:700,color:T.text,marginBottom:20}}>カレンダー連携設定</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+            <div style={{fontSize:16,fontWeight:700,color:T.text}}>カレンダー連携設定</div>
+            {managerFilter!=='all'&&(
+              <span style={{fontSize:11,color:T.accent,background:'#e8f0f5',padding:'3px 10px',borderRadius:4,fontWeight:500}}>
+                絞込中: {managerFilter}
+              </span>
+            )}
+          </div>
           <div style={T.card}>
             <div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div>
             <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>
               ☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {managers.map(m=>{const isSynced=!!calSyncMap[m];const isCopied=copiedManager===m; return(
+              {calSyncManagers.map(m=>{const isSynced=!!calSyncMap[m];const isCopied=copiedManager===m; return(
                 <div key={m} style={{borderRadius:8,background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`,overflow:'hidden'}}>
                   <label style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',cursor:'pointer'}}>
                     <input type="checkbox" checked={isSynced} onChange={()=>handleCalSyncToggle(m)} style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}}/>
