@@ -57,12 +57,22 @@ function GanttChart({clients,onEditClient}){
 
   if(!ganttClients.length)return<div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
 
-  // フラット行データを生成: [{ type:'name'|'bar', client, dt? }]
   const rows=[];
-  ganttClients.forEach(c=>{
-    rows.push({type:'name',client:c});
-    DEADLINE_TYPES.forEach(dt=>rows.push({type:'bar',client:c,dt}));
-  });
+  ganttClients.forEach(c=>{rows.push({type:'name',client:c});DEADLINE_TYPES.forEach(dt=>rows.push({type:'bar',client:c,dt}));});
+
+  const renderBarContent=(client,dt)=>{
+    const dateStr=client[dt.key];if(!dateStr)return null;
+    const days=getDaysUntil(dateStr);const status=getStatus(days);
+    const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
+    const barStartX=Math.max(0,Math.min(chartW,todayX));
+    let barColor=GANTT_BAR_COLORS[dt.key].bar;
+    if(status==='expired')barColor='#c0392b';else if(status==='warning')barColor='#d35400';else if(status==='caution')barColor='#b8860b';
+    const d=new Date(dateStr+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
+    const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
+    if(status==='expired'){return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(ROW_H-BAR_H)/2,width:6,height:BAR_H,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(ROW_H-12)/2,fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;}
+    const bw=Math.max(3,endX-barStartX);
+    return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:barStartX,top:(ROW_H-BAR_H)/2,width:bw,height:BAR_H,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>20&&endX<chartW-30&&<span style={{position:'absolute',left:endX+4,top:(ROW_H-12)/2,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
+  };
 
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
@@ -71,11 +81,15 @@ function GanttChart({clients,onEditClient}){
         <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:10,background:'#c0392b'}}/>今日</span>
       </div>
       <div ref={scrollRef} style={{overflowX:'auto'}}>
-        <table style={{borderCollapse:'collapse',minWidth:NAME_W+chartW}}>
+        <table style={{borderCollapse:'collapse',width:NAME_W+chartW,tableLayout:'fixed'}}>
+          <colgroup>
+            <col style={{width:NAME_W}}/>
+            {months.map((_,i)=><col key={i} style={{width:MON_W}}/>)}
+          </colgroup>
           <thead>
             <tr>
-              <th style={{position:'sticky',left:0,zIndex:4,width:NAME_W,minWidth:NAME_W,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:11,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'6px 8px'}}>利用者名</th>
-              {months.map((m,i)=>{const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();return<th key={i} style={{width:MON_W,minWidth:MON_W,borderBottom:'1px solid #d8d8d0',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',textAlign:'center',padding:'6px 0'}}>{m.getMonth()+1}月</th>;})}
+              <th style={{position:'sticky',left:0,zIndex:4,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:11,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'6px 8px'}}>利用者名</th>
+              {months.map((m,i)=>{const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();return<th key={i} style={{borderBottom:'1px solid #d8d8d0',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',textAlign:'center',padding:'6px 0'}}>{m.getMonth()+1}月</th>;})}
             </tr>
           </thead>
           <tbody>
@@ -92,34 +106,19 @@ function GanttChart({clients,onEditClient}){
                   </tr>
                 );
               }
-              // bar row
               const {client,dt}=row;
-              const dateStr=client[dt.key];
               const isLastBar=dt.key==='short_end';
               return(
                 <tr key={`b-${client.id}-${dt.key}`}>
                   <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 6px',height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',verticalAlign:'middle'}}>
                     <span style={{fontSize:9,color:'#8888a0'}}>{dt.short}</span>
                   </td>
-                  <td colSpan={MONTHS} style={{padding:0,height:ROW_H,position:'relative',borderBottom:isLastBar?'1px solid #eceae3':'none'}}>
-                    {dateStr&&(()=>{
-                      const days=getDaysUntil(dateStr);const status=getStatus(days);
-                      const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
-                      const barStartX=Math.max(0,Math.min(chartW,todayX));
-                      let barColor=GANTT_BAR_COLORS[dt.key].bar;
-                      if(status==='expired')barColor='#c0392b';else if(status==='warning')barColor='#d35400';else if(status==='caution')barColor='#b8860b';
-                      const d=new Date(dateStr+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
-                      const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
-                      if(status==='expired'){
-                        return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(ROW_H-BAR_H)/2,width:6,height:BAR_H,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(ROW_H-12)/2,fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;
-                      }
-                      const bw=Math.max(3,endX-barStartX);
-                      return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:barStartX,top:(ROW_H-BAR_H)/2,width:bw,height:BAR_H,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>20&&endX<chartW-30&&<span style={{position:'absolute',left:endX+4,top:(ROW_H-12)/2,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
-                    })()}
-                    {/* 月区切り線 */}
-                    {months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#f0efe8',pointerEvents:'none'}}/>)}
-                    {/* 今日線 */}
-                    <div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/>
+                  <td colSpan={MONTHS} style={{padding:0,height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',overflow:'visible'}}>
+                    <div style={{width:chartW,height:ROW_H,position:'relative'}}>
+                      {renderBarContent(client,dt)}
+                      {months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#f0efe8',pointerEvents:'none'}}/>)}
+                      <div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/>
+                    </div>
                   </td>
                 </tr>
               );
