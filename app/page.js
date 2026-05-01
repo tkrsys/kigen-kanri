@@ -33,6 +33,49 @@ function clientMatchesFilter(client,filter) { if(filter==='unset')return!hasAnyD
 function getVisibleCalendarKeys(client) { const n=normalizeClientDate(client.nintei_end),l=normalizeClientDate(client.long_end),s=normalizeClientDate(client.short_end); const k=[]; if(n)k.push('nintei_end'); if(l&&!(n&&n===l))k.push('long_end'); if(s&&!(n&&n===s)&&!(l&&l===s))k.push('short_end'); return k; }
 function getCalendarFeedUrl(managerName) { const base='https://careplan-kigen.vercel.app/api/calendar-feed?token=kenkou1975'; if(!managerName)return base; return base+'&manager='+encodeURIComponent(managerName); }
 
+function parseYearMonthToLastDay(input) {
+  if(!input||!input.trim())return null;
+  const s=input.trim().replace(/[／]/g,'/').replace(/[ー−]/g,'-');
+  const m1=s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if(!m1)return null;
+  const year=parseInt(m1[1],10);
+  const month=parseInt(m1[2],10);
+  if(month<1||month>12||year<2000||year>2100)return null;
+  const lastDay=new Date(year,month,0).getDate();
+  return`${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+}
+
+function YearMonthShortcut({onApply}){
+  const[val,setVal]=useState('');
+  const[msg,setMsg]=useState(null);
+  const handleApply=()=>{
+    const result=parseYearMonthToLastDay(val);
+    if(result){
+      onApply(result);
+      const d=new Date(result+'T00:00:00');
+      setMsg({ok:true,text:`→ ${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} を設定`});
+      setVal('');
+      setTimeout(()=>setMsg(null),2000);
+    }else{
+      setMsg({ok:false,text:'例: 2026/4'});
+      setTimeout(()=>setMsg(null),2000);
+    }
+  };
+  return(
+    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+      <input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}}
+        onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}}
+        placeholder="年/月 → 末日" inputMode="numeric"
+        style={{width:110,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/>
+      <button type="button" onClick={handleApply}
+        style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>
+        末日設定
+      </button>
+      {msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}
+    </div>
+  );
+}
+
 const T = { bg:'#f5f3ee', accent:'#2d5a7b', text:'#1a1a2e', sub:'#4a4a5a', muted:'#8888a0', border:'#d8d8d0',
   card:{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,padding:'16px 20px',marginBottom:12,boxShadow:'0 1px 3px rgba(0,0,0,.06)'},
   barStyle:{display:'inline-block',width:3,height:16,background:'#2d5a7b',borderRadius:2},
@@ -79,7 +122,7 @@ function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
   const visibleCalKeys=useMemo(()=>{const n=form.nintei_end||null,l=form.long_end||null,s=form.short_end||null,k=[];if(n)k.push('nintei_end');if(l&&!(n&&n===l))k.push('long_end');if(s&&!(n&&n===s)&&!(l&&l===s))k.push('short_end');return k;},[form]);
   const handleSave=async()=>{setSaving(true);setError('');try{const res=await fetch(`/api/clients/${client.id}/deadlines`,{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify(form)});if(res.ok){const data=await res.json();onSave(data.client);}else{const data=await res.json();setError(data.error||'保存に失敗しました');}}catch{setError('接続エラー');}setSaving(false);};
   return(<div style={{position:'fixed',inset:0,backgroundColor:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,fontFamily:"'Noto Sans JP', sans-serif"}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{width:'100%',maxWidth:440,backgroundColor:'#fff',borderRadius:12,padding:'28px 24px',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',maxHeight:'85vh',overflow:'auto'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,paddingBottom:12,borderBottom:'2px solid #2d5a7b'}}><div><h2 style={{margin:0,fontSize:16,fontWeight:600,color:T.text}}>期限設定</h2><p style={{margin:'4px 0 0',fontSize:13,color:T.muted}}>{client.name}{client.care_manager?` ・ 担当: ${client.care_manager}`:''}</p></div><button onClick={onClose} style={{background:'none',border:'none',fontSize:18,color:T.muted,cursor:'pointer'}}>✕</button></div>
-    {DEADLINE_TYPES.map(dt=>(<div key={dt.key} style={{marginBottom:16}}><label style={{display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6}}>{dt.label}</label><input type="date" value={form[dt.key]} onChange={e=>setForm({...form,[dt.key]:e.target.value})} style={{width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text}}/>{showCalendar&&form[dt.key]&&visibleCalKeys.includes(dt.key)&&<CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]}/>}</div>))}
+    {DEADLINE_TYPES.map(dt=>(<div key={dt.key} style={{marginBottom:16}}><label style={{display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6}}>{dt.label}</label><YearMonthShortcut onApply={v=>setForm(prev=>({...prev,[dt.key]:v}))}/><input type="date" value={form[dt.key]} onChange={e=>setForm({...form,[dt.key]:e.target.value})} style={{width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text}}/>{showCalendar&&form[dt.key]&&visibleCalKeys.includes(dt.key)&&<CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]}/>}</div>))}
     {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);}
 
 function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,isAdmin}){
@@ -157,14 +200,17 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
 
           <div style={{marginBottom:16}}>
             <label style={labelStyle}>認定期限</label>
+            <YearMonthShortcut onApply={v=>setNinteiEnd(v)}/>
             <input type="date" value={ninteiEnd} onChange={e=>setNinteiEnd(e.target.value)} style={inputStyle}/>
           </div>
           <div style={{marginBottom:16}}>
             <label style={labelStyle}>長期期限</label>
+            <YearMonthShortcut onApply={v=>setLongEnd(v)}/>
             <input type="date" value={longEnd} onChange={e=>setLongEnd(e.target.value)} style={inputStyle}/>
           </div>
           <div style={{marginBottom:16}}>
             <label style={labelStyle}>短期期限</label>
+            <YearMonthShortcut onApply={v=>setShortEnd(v)}/>
             <input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/>
           </div>
         </div>
