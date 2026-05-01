@@ -66,7 +66,7 @@ function YearMonthShortcut({onApply}){
 
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
-  const MONTHS=24,MON_W=64,NAME_W=100,ROW_H=22,BAR_H=12,STACK_H=18;
+  const MONTHS=24,MON_W=64,NAME_W=120,ROW_H=22,BAR_H=12,STACK_H=18;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
@@ -140,7 +140,7 @@ function GanttChart({clients,onEditClient}){
         <table style={{borderCollapse:'collapse',width:NAME_W+chartW,tableLayout:'fixed'}}>
           <colgroup><col style={{width:NAME_W}}/>{months.map((_,i)=><col key={i} style={{width:MON_W}}/>)}</colgroup>
           <thead><tr style={{position:'sticky',top:0,zIndex:5}}>
-            <th style={{position:'sticky',left:0,zIndex:6,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:10,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'0 6px',height:headerH,verticalAlign:'bottom',paddingBottom:4}}>利用者名</th>
+            <th style={{position:'sticky',left:0,zIndex:6,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:10,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'0 6px',height:headerH,verticalAlign:'bottom',paddingBottom:4,boxSizing:'border-box',width:NAME_W,minWidth:NAME_W,maxWidth:NAME_W}}>利用者名</th>
             {months.map((m,i)=>{
               const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
               const isJan=m.getMonth()===0;const isFirst=i===0;
@@ -159,12 +159,12 @@ function GanttChart({clients,onEditClient}){
               if(!isExp){
                 rows.push(
                   <tr key={`c-${client.id}`} onClick={()=>toggleExpand(client.id)} style={{cursor:'pointer',borderTop:ci>0?'1px solid #d8d8d0':'none'}}>
-                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',verticalAlign:'middle'}}>
+                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',verticalAlign:'middle',boxSizing:'border-box',width:NAME_W,minWidth:NAME_W,maxWidth:NAME_W}}>
                       <div style={{display:'flex',alignItems:'center',gap:4}}>
                         <span style={{fontSize:8,color:'#8888a0',flexShrink:0}}>▶</span>
                         <div style={{minWidth:0}}>
-                          <div style={{fontSize:10,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-30}}>{client.name}</div>
-                          <div style={{fontSize:7,color:'#8888a0'}}>{client.care_manager||''}</div>
+                          <div style={{fontSize:12,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-32}}>{client.name}</div>
+                          <div style={{fontSize:9,color:'#8888a0'}}>{client.care_manager||''}</div>
                         </div>
                       </div>
                     </td>
@@ -182,12 +182,12 @@ function GanttChart({clients,onEditClient}){
               } else {
                 rows.push(
                   <tr key={`n-${client.id}`} onClick={()=>toggleExpand(client.id)} style={{cursor:'pointer',borderTop:ci>0?'1px solid #d8d8d0':'none'}}>
-                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',verticalAlign:'middle'}}>
+                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',verticalAlign:'middle',boxSizing:'border-box',width:NAME_W,minWidth:NAME_W,maxWidth:NAME_W}}>
                       <div style={{display:'flex',alignItems:'center',gap:4}}>
                         <span style={{fontSize:8,color:'#8888a0',flexShrink:0,transform:'rotate(90deg)'}}>▶</span>
                         <div style={{minWidth:0}}>
-                          <div style={{fontSize:10,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-30}}>{client.name}</div>
-                          <div style={{fontSize:7,color:'#8888a0'}}>{client.care_manager||''}</div>
+                          <div style={{fontSize:12,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-32}}>{client.name}</div>
+                          <div style={{fontSize:9,color:'#8888a0'}}>{client.care_manager||''}</div>
                         </div>
                       </div>
                     </td>
@@ -198,7 +198,7 @@ function GanttChart({clients,onEditClient}){
                   const isLast=di===DEADLINE_TYPES.length-1;
                   rows.push(
                     <tr key={`b-${client.id}-${dt.key}`}>
-                      <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 5px 0 18px',height:ROW_H,borderBottom:isLast?'1px solid #eceae3':'none',verticalAlign:'middle'}}>
+                      <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 5px 0 18px',height:ROW_H,borderBottom:isLast?'1px solid #eceae3':'none',verticalAlign:'middle',boxSizing:'border-box',width:NAME_W,minWidth:NAME_W,maxWidth:NAME_W}}>
                         <span style={{fontSize:8,color:GANTT_BAR_COLORS[dt.key].lbl,fontWeight:600}}>{dt.short}</span>
                       </td>
                       <td colSpan={MONTHS} style={{padding:0,height:ROW_H,borderBottom:isLast?'1px solid #eceae3':'none',overflow:'visible'}}>
@@ -254,7 +254,8 @@ function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
   const handleSave=async()=>{setSaving(true);setError('');try{const res=await fetch(`/api/clients/${client.id}/deadlines`,{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify(form)});if(res.ok){const data=await res.json();onSave(data.client);}else{const data=await res.json();setError(data.error||'保存に失敗しました');}}catch{setError('接続エラー');}setSaving(false);};
   return(<div style={{position:'fixed',inset:0,backgroundColor:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,fontFamily:"'Noto Sans JP', sans-serif"}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{width:'100%',maxWidth:440,backgroundColor:'#fff',borderRadius:12,padding:'28px 24px',boxShadow:'0 4px 20px rgba(0,0,0,0.1)',maxHeight:'85vh',overflow:'auto'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,paddingBottom:12,borderBottom:'2px solid #2d5a7b'}}><div><h2 style={{margin:0,fontSize:16,fontWeight:600,color:T.text}}>期限設定</h2><p style={{margin:'4px 0 0',fontSize:13,color:T.muted}}>{client.name}{client.care_manager?` ・ 担当: ${client.care_manager}`:''}</p></div><button onClick={onClose} style={{background:'none',border:'none',fontSize:18,color:T.muted,cursor:'pointer'}}>✕</button></div>
     {DEADLINE_TYPES.map(dt=>(<div key={dt.key} style={{marginBottom:16}}><label style={{display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6}}>{dt.label}</label><YearMonthShortcut onApply={v=>setForm(prev=>({...prev,[dt.key]:v}))}/><input type="date" value={form[dt.key]} onChange={e=>setForm({...form,[dt.key]:e.target.value})} style={{width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text}}/>{showCalendar&&form[dt.key]&&visibleCalKeys.includes(dt.key)&&<CalendarPreview typeKey={dt.key} userName={client.name} dateStr={form[dt.key]}/>}</div>))}
-    {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);}
+    {error&&<p style={{color:'#c0392b',fontSize:13,margin:'8px 0'}}>{error}</p>}<div style={{display:'flex',gap:10,marginTop:20}}><button onClick={onClose} style={{...T.btnSecondary,flex:1,padding:'10px 0'}}>キャンセル</button><button onClick={handleSave} disabled={saving} style={{...T.btnPrimary,flex:1,padding:'10px 0',opacity:saving?0.5:1}}>{saving?'保存中...':'保存'}</button></div></div></div>);
+}
 
 function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,isAdmin}){
   const savedCM=typeof window!=='undefined'?localStorage.getItem('kigen-reg-cm')||'':'';const initialCM=managerList.includes(savedCM)?savedCM:(managerList[0]||'');
