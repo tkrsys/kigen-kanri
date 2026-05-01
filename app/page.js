@@ -31,6 +31,7 @@ function getClientStatuses(client) { const s=new Set(); for(const dt of DEADLINE
 function hasAnyDeadline(client) { return DEADLINE_TYPES.some(dt=>client[dt.key]); }
 function clientMatchesFilter(client,filter) { if(filter==='unset')return!hasAnyDeadline(client); const s=getClientStatuses(client);if(s.size===0)return false; if(filter==='attention')return s.has('expired')||s.has('warning')||s.has('caution'); return s.has(filter); }
 function getVisibleCalendarKeys(client) { const n=normalizeClientDate(client.nintei_end),l=normalizeClientDate(client.long_end),s=normalizeClientDate(client.short_end); const k=[]; if(n)k.push('nintei_end'); if(l&&!(n&&n===l))k.push('long_end'); if(s&&!(n&&n===s)&&!(l&&l===s))k.push('short_end'); return k; }
+function getCalendarFeedUrl(managerName) { const base='https://careplan-kigen.vercel.app/api/calendar-feed?token=kenkou1975'; if(!managerName)return base; return base+'&manager='+encodeURIComponent(managerName); }
 
 const T = { bg:'#f5f3ee', accent:'#2d5a7b', text:'#1a1a2e', sub:'#4a4a5a', muted:'#8888a0', border:'#d8d8d0',
   card:{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,padding:'16px 20px',marginBottom:12,boxShadow:'0 1px 3px rgba(0,0,0,.06)'},
@@ -44,6 +45,8 @@ const T = { bg:'#f5f3ee', accent:'#2d5a7b', text:'#1a1a2e', sub:'#4a4a5a', muted
 };
 const GearIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8888a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
 const EyeIcon = ({show}) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8888a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{show?<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>:<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></>}</svg>;
+const CopyIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+const CheckIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 
 function DaysBadge({days}){if(days===null)return<span style={{fontSize:11,color:T.muted,padding:'2px 8px',borderRadius:4,background:'#eceae3'}}>未設定</span>;const s=getStatus(days),c=STATUS_CONFIG[s];return<span style={{fontSize:11,fontWeight:600,color:c.color,background:c.bg,padding:'2px 8px',borderRadius:4}}>{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>;}
 function DeadlineSummaryInline({days,label}){if(days===null)return<span style={{fontSize:12,color:T.muted}}>{label}:未設定</span>;const s=getStatus(days),c=STATUS_CONFIG[s];return<span style={{fontSize:12,color:c.color,fontWeight:600}}>{label}:{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>;}
@@ -183,6 +186,7 @@ export default function KigenKanri(){
   const[calSyncMap,setCalSyncMap]=useState({});const[isAdmin,setIsAdmin]=useState(false);
   const[showGearMenu,setShowGearMenu]=useState(false);const[mode,setMode]=useState('list');
   const[allManagers,setAllManagers]=useState([]);
+  const[copiedManager,setCopiedManager]=useState(null);
   const gearRef=useRef(null);
 
   useEffect(()=>{const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);
@@ -197,7 +201,14 @@ export default function KigenKanri(){
   const fetchManagers=useCallback(async(p)=>{try{const res=await fetch('/api/care-managers',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setAllManagers((data.managers||[]).map(m=>m.name));}}catch(e){console.error(e);}},[]);
   useEffect(()=>{if(pin)fetchManagers(pin);},[pin,fetchManagers]);
 
-  const handleCalSyncToggle=async(name)=>{const newVal=!calSyncMap[name];setCalSyncMap(prev=>({...prev,[name]:newVal}));try{await fetch('/api/care-managers',{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({manager_name:name,calendar_sync:newVal})});}catch(e){console.error(e);}};
+  const handleCalSyncToggle=async(name)=>{const newVal=!calSyncMap[name];setCalSyncMap(prev=>({...prev,[name]:newVal}));if(!newVal)setCopiedManager(null);try{await fetch('/api/care-managers',{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({manager_name:name,calendar_sync:newVal})});}catch(e){console.error(e);}};
+
+  const handleCopyUrl=async(managerName)=>{
+    const url=getCalendarFeedUrl(managerName);
+    try{await navigator.clipboard.writeText(url);setCopiedManager(managerName);setTimeout(()=>setCopiedManager(prev=>prev===managerName?null:prev),2000);}catch{
+      const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);setCopiedManager(managerName);setTimeout(()=>setCopiedManager(prev=>prev===managerName?null:prev),2000);
+    }
+  };
 
   const managers=useMemo(()=>{const set=new Set(clients.map(c=>c.care_manager).filter(Boolean));return Array.from(set).sort();},[clients]);
   const filteredClients=useMemo(()=>{let list=clients;if(managerFilter!=='all')list=list.filter(c=>c.care_manager===managerFilter);return list;},[clients,managerFilter]);
@@ -260,13 +271,26 @@ export default function KigenKanri(){
             <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>
               ☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {managers.map(m=>{const isSynced=!!calSyncMap[m]; return(
-                <label key={m} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:8,cursor:'pointer',
-                  background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`}}>
-                  <input type="checkbox" checked={isSynced} onChange={()=>handleCalSyncToggle(m)} style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}}/>
-                  <span style={{fontSize:14,fontWeight:500,color:T.text}}>{m}</span>
-                  <span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span>
-                </label>
+              {managers.map(m=>{const isSynced=!!calSyncMap[m];const isCopied=copiedManager===m; return(
+                <div key={m} style={{borderRadius:8,background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`,overflow:'hidden'}}>
+                  <label style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',cursor:'pointer'}}>
+                    <input type="checkbox" checked={isSynced} onChange={()=>handleCalSyncToggle(m)} style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}}/>
+                    <span style={{fontSize:14,fontWeight:500,color:T.text}}>{m}</span>
+                    <span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span>
+                  </label>
+                  {isSynced&&(
+                    <div style={{padding:'0 14px 12px',borderTop:'1px solid #b8ddd0'}}>
+                      <p style={{margin:'8px 0 6px',fontSize:11,color:T.sub,fontWeight:500}}>📋 カレンダー同期URL</p>
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        <input type="text" readOnly value={getCalendarFeedUrl(m)} style={{flex:1,padding:'7px 10px',fontSize:11,border:'1px solid #d8d8d0',borderRadius:5,background:'#fff',color:T.sub,outline:'none',boxSizing:'border-box',fontFamily:'monospace'}}/>
+                        <button onClick={()=>handleCopyUrl(m)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:4,padding:'6px 12px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,cursor:'pointer',background:isCopied?'#27766a':'#fff',color:isCopied?'#fff':T.sub,transition:'all 0.2s'}}>
+                          {isCopied?<><CheckIcon/> コピー済</>:<><CopyIcon/> コピー</>}
+                        </button>
+                      </div>
+                      <p style={{margin:'6px 0 0',fontSize:10,color:T.muted,lineHeight:1.4}}>GoogleカレンダーのURL追加で登録してください</p>
+                    </div>
+                  )}
+                </div>
               );})}
             </div>
           </div>
