@@ -12,6 +12,12 @@ const DEADLINE_TYPES = [
   { key: 'long_end',  label: '長期期限', short: '長期' },
   { key: 'nintei_end', label: '認定期限', short: '認定' },
 ];
+/* 重ね描画用: 下から認定→長期→短期 の順で描画 */
+const STACKED_ORDER = [
+  { key: 'nintei_end', short: '認定' },
+  { key: 'long_end',  short: '長期' },
+  { key: 'short_end', short: '短期' },
+];
 const CAL_CONFIG = {
   nintei_end: { label: '認定期限', preAction: '認定調査 ｱｾｽﾒﾝﾄ', midAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
   long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
@@ -46,8 +52,7 @@ function YearMonthShortcut({onApply}){
 
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
-  /* ★変更: 24ヶ月、月幅64px、名前幅100px */
-  const MONTHS=24,MON_W=64,NAME_W=100,ROW_H=22,BAR_H=12;
+  const MONTHS=24,MON_W=64,NAME_W=100,ROW_H=22,BAR_H=12,STACK_H=18;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
@@ -58,13 +63,14 @@ function GanttChart({clients,onEditClient}){
   const ganttClients=useMemo(()=>clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{const da=getEarliestDays(a)??Infinity,db=getEarliestDays(b)??Infinity;return da-db;}),[clients]);
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollLeft=Math.max(0,todayX-60);},[]);
+  /* ★アコーディオン用state */
+  const[expandedGantt,setExpandedGantt]=useState({});
+  const toggleExpand=id=>setExpandedGantt(p=>({...p,[id]:!p[id]}));
 
   if(!ganttClients.length)return<div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
 
-  const rows=[];
-  ganttClients.forEach(c=>{rows.push({type:'name',client:c});DEADLINE_TYPES.forEach(dt=>rows.push({type:'bar',client:c,dt}));});
-
-  const renderBarContent=(client,dt)=>{
+  /* 展開時の個別バー描画 */
+  const renderBarContent=(client,dt,rowH,barH)=>{
     const dateStr=client[dt.key];if(!dateStr)return null;
     const days=getDaysUntil(dateStr);const status=getStatus(days);
     const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
@@ -73,12 +79,43 @@ function GanttChart({clients,onEditClient}){
     const lblColor=status==='warning'?'#d35400':status==='caution'?'#b8860b':barColor;
     const d=new Date(nd(dateStr)+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
     const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
-    if(status==='expired'){return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(ROW_H-BAR_H)/2,width:6,height:BAR_H,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(ROW_H-10)/2,fontSize:8,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;}
+    if(status==='expired'){return<><div onClick={e=>{e.stopPropagation();onEditClient(client);}} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(rowH-barH)/2,width:6,height:barH,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(rowH-10)/2,fontSize:8,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;}
     const bw=Math.max(3,endX-barStartX);
-    return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:barStartX,top:(ROW_H-BAR_H)/2,width:bw,height:BAR_H,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>16&&endX<chartW-24&&<span style={{position:'absolute',left:endX+3,top:(ROW_H-10)/2,fontSize:8,color:lblColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
+    return<><div onClick={e=>{e.stopPropagation();onEditClient(client);}} title={tip} style={{position:'absolute',left:barStartX,top:(rowH-barH)/2,width:bw,height:barH,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>16&&endX<chartW-24&&<span style={{position:'absolute',left:endX+3,top:(rowH-10)/2,fontSize:8,color:lblColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
   };
 
-  /* ★ヘッダー: 年の変わり目を検出して年ラベル付き2段ヘッダー */
+  /* ★折りたたみ時の重ねバー描画（認定→長期→短期の順で重ね、短期が一番手前） */
+  const renderStackedBars=(client)=>{
+    const h=STACK_H;const layers=[];
+    /* 下から順に描画: 認定(紺)→長期(緑)→短期(黄土) */
+    STACKED_ORDER.forEach((dt,li)=>{
+      const dateStr=client[dt.key];if(!dateStr)return;
+      const days=getDaysUntil(dateStr);const status=getStatus(days);
+      const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
+      const barStartX=Math.max(0,Math.min(chartW,todayX));
+      const barColor=GANTT_BAR_COLORS[dt.key].bar;
+      const barH=h-li*2; /* 認定=18, 長期=16, 短期=14 */
+      const topOff=(h-barH)/2;
+      const d=new Date(nd(dateStr)+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
+      const tip=`${dt.short}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
+      if(status==='expired'){
+        layers.push(<div key={dt.key+'m'} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:topOff,width:6,height:barH,borderRadius:2,background:'#c0392b',zIndex:10+li}}/>);
+        layers.push(<span key={dt.key+'l'} style={{position:'absolute',left:Math.max(0,endX+8),top:topOff,fontSize:7,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap',zIndex:10+li}}>{lbl}</span>);
+      } else {
+        const bw=Math.max(3,endX-barStartX);
+        layers.push(<div key={dt.key+'b'} title={tip} style={{position:'absolute',left:barStartX,top:topOff,width:bw,height:barH,borderRadius:3,background:barColor,opacity:0.85,zIndex:10+li}}/>);
+        if(endX>16&&endX<chartW-24){
+          layers.push(<span key={dt.key+'l'} style={{position:'absolute',left:endX+3,top:topOff,fontSize:7,color:barColor,fontWeight:600,whiteSpace:'nowrap',zIndex:10+li}}>{lbl}</span>);
+        }
+      }
+    });
+    return layers;
+  };
+
+  /* 月境界のグリッド線を描画 */
+  const renderGridLines=(rowH)=>months.map((_,i)=>{if(i===0)return null;const m=months[i];const isJan=m.getMonth()===0;return<div key={'g'+i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:isJan?2:1,background:isJan?'#c8c8c0':'#f0efe8',pointerEvents:'none'}}/>;});
+  const renderTodayLine=(rowH)=><div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/>;
+
   const headerH=38;
 
   return(
@@ -86,18 +123,16 @@ function GanttChart({clients,onEditClient}){
       <div style={{display:'flex',padding:'6px 10px',gap:12,flexWrap:'wrap',borderBottom:'1px solid #eceae3'}}>
         {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:3,fontSize:10,color:'#4a4a5a'}}><span style={{display:'inline-block',width:12,height:7,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
         <span style={{display:'flex',alignItems:'center',gap:3,fontSize:10,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:9,background:'#c0392b'}}/>今日</span>
+        <span style={{fontSize:9,color:'#8888a0',marginLeft:'auto'}}>クリックで展開</span>
       </div>
-      {/* ★スクロールコンテナ: overflow両方向、maxHeightで上下スクロール */}
       <div ref={scrollRef} style={{overflow:'auto',maxHeight:'70vh'}}>
         <table style={{borderCollapse:'collapse',width:NAME_W+chartW,tableLayout:'fixed'}}>
           <colgroup><col style={{width:NAME_W}}/>{months.map((_,i)=><col key={i} style={{width:MON_W}}/>)}</colgroup>
-          {/* ★ヘッダー: sticky top:0 で上下スクロール時に固定 */}
           <thead><tr style={{position:'sticky',top:0,zIndex:5}}>
             <th style={{position:'sticky',left:0,zIndex:6,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:10,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'0 6px',height:headerH,verticalAlign:'bottom',paddingBottom:4}}>利用者名</th>
             {months.map((m,i)=>{
               const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
-              const isJan=m.getMonth()===0;
-              const isFirst=i===0;
+              const isJan=m.getMonth()===0;const isFirst=i===0;
               return<th key={i} style={{borderBottom:'1px solid #d8d8d0',borderRight:'1px solid #eceae3',borderLeft:isJan&&!isFirst?'2px solid #c8c8c0':'none',fontSize:10,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',textAlign:'center',padding:0,height:headerH,verticalAlign:'bottom',paddingBottom:4,position:'relative'}}>
                 {(isJan||isFirst)&&<div style={{position:'absolute',top:2,left:isFirst?2:4,fontSize:9,fontWeight:700,color:'#2d5a7b'}}>{m.getFullYear()}</div>}
                 {m.getMonth()+1}月
@@ -105,11 +140,70 @@ function GanttChart({clients,onEditClient}){
             })}
           </tr></thead>
           <tbody>
-            {rows.map((row,ri)=>{
-              if(row.type==='name'){const ws=getWorstStatus(row.client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';return(
-                <tr key={`n-${row.client.id}`} style={{borderTop:ri>0?'2px solid #d8d8d0':'none'}}><td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',cursor:'pointer',verticalAlign:'middle'}} onClick={()=>onEditClient(row.client)} title="クリックして編集"><div style={{fontSize:10,fontWeight:600,color:'#1a1a2e',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-18}}>{row.client.name}</div><div style={{fontSize:7,color:'#8888a0'}}>{row.client.care_manager||''}</div></td><td colSpan={MONTHS} style={{padding:0,height:0}}/></tr>);}
-              const {client,dt}=row;const isLastBar=dt.key===DEADLINE_TYPES[DEADLINE_TYPES.length-1].key;
-              return(<tr key={`b-${client.id}-${dt.key}`}><td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 5px',height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',verticalAlign:'middle'}}><span style={{fontSize:8,color:'#8888a0'}}>{dt.short}</span></td><td colSpan={MONTHS} style={{padding:0,height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',overflow:'visible'}}><div style={{width:chartW,height:ROW_H,position:'relative'}}>{renderBarContent(client,dt)}{months.map((_,i)=>{const m=months[i];const isJan=m.getMonth()===0&&i>0;return i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:isJan?2:1,background:isJan?'#c8c8c0':'#f0efe8',pointerEvents:'none'}}/>})}<div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/></div></td></tr>);
+            {ganttClients.map((client,ci)=>{
+              const isExp=!!expandedGantt[client.id];
+              const ws=getWorstStatus(client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';
+              const rows=[];
+
+              if(!isExp){
+                /* ★折りたたみ: 名前+重ねバーを1行で表示 */
+                rows.push(
+                  <tr key={`c-${client.id}`} onClick={()=>toggleExpand(client.id)} style={{cursor:'pointer',borderTop:ci>0?'1px solid #d8d8d0':'none'}}>
+                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',verticalAlign:'middle'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:4}}>
+                        <span style={{fontSize:8,color:'#8888a0',flexShrink:0,transform:'rotate(0deg)',transition:'transform 0.2s'}}>▶</span>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:10,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-30}}>{client.name}</div>
+                          <div style={{fontSize:7,color:'#8888a0'}}>{client.care_manager||''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td colSpan={MONTHS} style={{padding:0,height:STACK_H+6,borderBottom:'none'}}>
+                      <div style={{width:chartW,height:STACK_H+6,position:'relative',paddingTop:3}}>
+                        <div style={{position:'relative',height:STACK_H}}>
+                          {renderStackedBars(client)}
+                        </div>
+                        {renderGridLines(STACK_H+6)}
+                        {renderTodayLine(STACK_H+6)}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              } else {
+                /* ★展開: 名前行 + 3つの個別バー行 */
+                rows.push(
+                  <tr key={`n-${client.id}`} onClick={()=>toggleExpand(client.id)} style={{cursor:'pointer',borderTop:ci>0?'1px solid #d8d8d0':'none'}}>
+                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'3px 5px',verticalAlign:'middle'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:4}}>
+                        <span style={{fontSize:8,color:'#8888a0',flexShrink:0,transform:'rotate(90deg)',transition:'transform 0.2s'}}>▶</span>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:10,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-30}}>{client.name}</div>
+                          <div style={{fontSize:7,color:'#8888a0'}}>{client.care_manager||''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td colSpan={MONTHS} style={{padding:0,height:0}}/>
+                  </tr>
+                );
+                DEADLINE_TYPES.forEach((dt,di)=>{
+                  const isLast=di===DEADLINE_TYPES.length-1;
+                  rows.push(
+                    <tr key={`b-${client.id}-${dt.key}`}>
+                      <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 5px 0 18px',height:ROW_H,borderBottom:isLast?'1px solid #eceae3':'none',verticalAlign:'middle'}}>
+                        <span style={{fontSize:8,color:'#8888a0'}}>{dt.short}</span>
+                      </td>
+                      <td colSpan={MONTHS} style={{padding:0,height:ROW_H,borderBottom:isLast?'1px solid #eceae3':'none',overflow:'visible'}}>
+                        <div style={{width:chartW,height:ROW_H,position:'relative'}}>
+                          {renderBarContent(client,dt,ROW_H,BAR_H)}
+                          {renderGridLines(ROW_H)}
+                          {renderTodayLine(ROW_H)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                });
+              }
+              return rows;
             })}
           </tbody>
         </table>
