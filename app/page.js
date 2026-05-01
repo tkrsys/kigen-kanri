@@ -7,7 +7,6 @@ const STATUS_CONFIG = {
   caution:  { label: '要注意', color: '#8b6914', bg: '#fdf8ee' },
   safe:     { label: '余裕あり', color: '#27766a', bg: '#e8f5f0' },
 };
-/* ★並び順変更: 短期→長期→認定（期限が短い方が上） */
 const DEADLINE_TYPES = [
   { key: 'short_end', label: '短期期限', short: '短期' },
   { key: 'long_end',  label: '長期期限', short: '長期' },
@@ -31,7 +30,6 @@ function getNoticeDateStr(dateStr,mb) { const d=new Date(nd(dateStr)+'T00:00:00'
 function getActionMonth(dateStr,offset) { const d=new Date(nd(dateStr)+'T00:00:00'); let m=d.getMonth()+1+offset; if(m<=0)m+=12; if(m>12)m-=12; return m; }
 function buildCalendarTitles(typeKey,userName,dateStr) { if(!dateStr)return null; const n=nd(dateStr); const config=CAL_CONFIG[typeKey]; const d=new Date(n+'T00:00:00'); const endLabel=`${d.getMonth()+1}/${d.getDate()}`; const pre=getNoticeDateStr(n,2),mid=getNoticeDateStr(n,1),day=getNoticeDateStr(n,0); const pD=new Date(pre+'T00:00:00'),mD=new Date(mid+'T00:00:00'),dD=new Date(day+'T00:00:00'); return { pre:{date:`${pD.getMonth()+1}/${pD.getDate()}`,title:`【${config.label} 2ヶ月前】${userName} ${endLabel}(${getActionMonth(n,-1)}月 ${config.preAction})`}, mid:{date:`${mD.getMonth()+1}/${mD.getDate()}`,title:`【${config.label} 1ヶ月前】${userName} ${endLabel}(${getActionMonth(n,0)}月 ${config.midAction})`}, day:{date:`${dD.getMonth()+1}/${dD.getDate()}`,title:`【${config.label}　　　　】${userName} ${endLabel}`} }; }
 function getWorstStatus(client) { const p={expired:0,warning:1,caution:2,safe:3}; let w=null; for(const dt of DEADLINE_TYPES){const s=getStatus(getDaysUntil(client[dt.key]));if(s===null)continue;if(w===null||p[s]<p[w])w=s;} return w; }
-/* ★追加: 全期限の中で最も近い期限の残日数を返す（ソート用） */
 function getEarliestDays(client) { let min=Infinity; for(const dt of DEADLINE_TYPES){const d=getDaysUntil(client[dt.key]);if(d!==null&&d<min)min=d;} return min===Infinity?null:min; }
 function getClientStatuses(client) { const s=new Set(); for(const dt of DEADLINE_TYPES){const st=getStatus(getDaysUntil(client[dt.key]));if(st!==null)s.add(st);} return s; }
 function hasAnyDeadline(client) { return DEADLINE_TYPES.some(dt=>client[dt.key]); }
@@ -56,7 +54,6 @@ function GanttChart({clients,onEditClient}){
   const chartW=MON_W*MONTHS;
   const dayToX=dv=>{const n=nd(dv);const d=new Date(typeof n==='string'?n+'T00:00:00':n);return((d-startDate)/86400000/totalDays)*chartW;};
   const todayX=dayToX(today);
-  /* ★ソート変更: 最も近い期限の残日数順（期限切れ→迫る→余裕ある） */
   const ganttClients=useMemo(()=>clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{const da=getEarliestDays(a)??Infinity,db=getEarliestDays(b)??Infinity;return da-db;}),[clients]);
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollLeft=Math.max(0,todayX-120);},[]);
@@ -71,13 +68,14 @@ function GanttChart({clients,onEditClient}){
     const days=getDaysUntil(dateStr);const status=getStatus(days);
     const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
     const barStartX=Math.max(0,Math.min(chartW,todayX));
-    let barColor=GANTT_BAR_COLORS[dt.key].bar;
-    if(status==='expired')barColor='#c0392b';else if(status==='warning')barColor='#d35400';else if(status==='caution')barColor='#b8860b';
+    /* ★修正: バー色は常に種別固定色。ラベル色だけステータスで変える */
+    const barColor=GANTT_BAR_COLORS[dt.key].bar;
+    const lblColor=status==='warning'?'#d35400':status==='caution'?'#b8860b':barColor;
     const d=new Date(nd(dateStr)+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
     const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
     if(status==='expired'){return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(ROW_H-BAR_H)/2,width:6,height:BAR_H,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(ROW_H-12)/2,fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;}
     const bw=Math.max(3,endX-barStartX);
-    return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:barStartX,top:(ROW_H-BAR_H)/2,width:bw,height:BAR_H,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>20&&endX<chartW-30&&<span style={{position:'absolute',left:endX+4,top:(ROW_H-12)/2,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
+    return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:barStartX,top:(ROW_H-BAR_H)/2,width:bw,height:BAR_H,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>20&&endX<chartW-30&&<span style={{position:'absolute',left:endX+4,top:(ROW_H-12)/2,fontSize:9,color:lblColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
   };
 
   return(
@@ -88,47 +86,17 @@ function GanttChart({clients,onEditClient}){
       </div>
       <div ref={scrollRef} style={{overflowX:'auto'}}>
         <table style={{borderCollapse:'collapse',width:NAME_W+chartW,tableLayout:'fixed'}}>
-          <colgroup>
-            <col style={{width:NAME_W}}/>
-            {months.map((_,i)=><col key={i} style={{width:MON_W}}/>)}
-          </colgroup>
-          <thead>
-            <tr>
-              <th style={{position:'sticky',left:0,zIndex:4,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:11,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'6px 8px'}}>利用者名</th>
-              {months.map((m,i)=>{const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();return<th key={i} style={{borderBottom:'1px solid #d8d8d0',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',textAlign:'center',padding:'6px 0'}}>{m.getMonth()+1}月</th>;})}
-            </tr>
-          </thead>
+          <colgroup><col style={{width:NAME_W}}/>{months.map((_,i)=><col key={i} style={{width:MON_W}}/>)}</colgroup>
+          <thead><tr>
+            <th style={{position:'sticky',left:0,zIndex:4,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:11,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'6px 8px'}}>利用者名</th>
+            {months.map((m,i)=>{const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();return<th key={i} style={{borderBottom:'1px solid #d8d8d0',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',textAlign:'center',padding:'6px 0'}}>{m.getMonth()+1}月</th>;})}
+          </tr></thead>
           <tbody>
             {rows.map((row,ri)=>{
-              if(row.type==='name'){
-                const ws=getWorstStatus(row.client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';
-                return(
-                  <tr key={`n-${row.client.id}`} style={{borderTop:ri>0?'2px solid #d8d8d0':'none'}}>
-                    <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'4px 6px',cursor:'pointer',verticalAlign:'middle'}} onClick={()=>onEditClient(row.client)} title="クリックして編集">
-                      <div style={{fontSize:11,fontWeight:600,color:'#1a1a2e',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-20}}>{row.client.name}</div>
-                      <div style={{fontSize:8,color:'#8888a0'}}>{row.client.care_manager||''}</div>
-                    </td>
-                    <td colSpan={MONTHS} style={{padding:0,height:0}}/>
-                  </tr>
-                );
-              }
-              const {client,dt}=row;
-              /* ★修正: DEADLINE_TYPESの最後の要素（認定）で区切り線 */
-              const isLastBar=dt.key===DEADLINE_TYPES[DEADLINE_TYPES.length-1].key;
-              return(
-                <tr key={`b-${client.id}-${dt.key}`}>
-                  <td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 6px',height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',verticalAlign:'middle'}}>
-                    <span style={{fontSize:9,color:'#8888a0'}}>{dt.short}</span>
-                  </td>
-                  <td colSpan={MONTHS} style={{padding:0,height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',overflow:'visible'}}>
-                    <div style={{width:chartW,height:ROW_H,position:'relative'}}>
-                      {renderBarContent(client,dt)}
-                      {months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#f0efe8',pointerEvents:'none'}}/>)}
-                      <div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/>
-                    </div>
-                  </td>
-                </tr>
-              );
+              if(row.type==='name'){const ws=getWorstStatus(row.client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';return(
+                <tr key={`n-${row.client.id}`} style={{borderTop:ri>0?'2px solid #d8d8d0':'none'}}><td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',borderLeft:`3px solid ${wc}`,padding:'4px 6px',cursor:'pointer',verticalAlign:'middle'}} onClick={()=>onEditClient(row.client)} title="クリックして編集"><div style={{fontSize:11,fontWeight:600,color:'#1a1a2e',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-20}}>{row.client.name}</div><div style={{fontSize:8,color:'#8888a0'}}>{row.client.care_manager||''}</div></td><td colSpan={MONTHS} style={{padding:0,height:0}}/></tr>);}
+              const {client,dt}=row;const isLastBar=dt.key===DEADLINE_TYPES[DEADLINE_TYPES.length-1].key;
+              return(<tr key={`b-${client.id}-${dt.key}`}><td style={{position:'sticky',left:0,zIndex:3,background:'#fafaf8',borderRight:'2px solid #d8d8d0',padding:'0 6px',height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',verticalAlign:'middle'}}><span style={{fontSize:9,color:'#8888a0'}}>{dt.short}</span></td><td colSpan={MONTHS} style={{padding:0,height:ROW_H,borderBottom:isLastBar?'1px solid #eceae3':'none',overflow:'visible'}}><div style={{width:chartW,height:ROW_H,position:'relative'}}>{renderBarContent(client,dt)}{months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#f0efe8',pointerEvents:'none'}}/>)}<div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/></div></td></tr>);
             })}
           </tbody>
         </table>
