@@ -66,7 +66,7 @@ function YearMonthShortcut({onApply}){
 
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
-  const MONTHS=24,MON_W=64,NAME_W=120,ROW_H=22,BAR_H=12,STACK_H=18;
+  const MONTHS=24,MON_W=64,NAME_W=140,ROW_H=22,BAR_H=12,STACK_H=18;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
@@ -132,15 +132,15 @@ function GanttChart({clients,onEditClient}){
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
       <div style={{display:'flex',padding:'6px 10px',gap:12,flexWrap:'wrap',borderBottom:'1px solid #eceae3'}}>
-        {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:3,fontSize:10,color:'#4a4a5a'}}><span style={{display:'inline-block',width:12,height:7,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
-        <span style={{display:'flex',alignItems:'center',gap:3,fontSize:10,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:9,background:'#c0392b'}}/>今日</span>
-        <span style={{fontSize:9,color:'#8888a0',marginLeft:'auto'}}>クリックで展開</span>
+        {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:3,fontSize:12,color:'#4a4a5a'}}><span style={{display:'inline-block',width:12,height:7,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
+        <span style={{display:'flex',alignItems:'center',gap:3,fontSize:12,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:9,background:'#c0392b'}}/>今日</span>
+        <span style={{fontSize:11,color:'#8888a0',marginLeft:'auto'}}>クリックで展開</span>
       </div>
       <div ref={scrollRef} style={{overflow:'auto',maxHeight:'70vh'}}>
         <table style={{borderCollapse:'collapse',width:NAME_W+chartW,tableLayout:'fixed'}}>
           <colgroup><col style={{width:NAME_W}}/>{months.map((_,i)=><col key={i} style={{width:MON_W}}/>)}</colgroup>
           <thead><tr style={{position:'sticky',top:0,zIndex:5}}>
-            <th style={{position:'sticky',left:0,zIndex:6,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:10,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'0 6px',height:headerH,verticalAlign:'bottom',paddingBottom:4,boxSizing:'border-box',width:NAME_W,minWidth:NAME_W,maxWidth:NAME_W}}>利用者名</th>
+            <th style={{position:'sticky',left:0,zIndex:6,background:'#fafaf8',borderBottom:'1px solid #d8d8d0',borderRight:'2px solid #d8d8d0',fontSize:11,fontWeight:600,color:'#2d5a7b',textAlign:'left',padding:'0 6px',height:headerH,verticalAlign:'bottom',paddingBottom:4,boxSizing:'border-box',width:NAME_W,minWidth:NAME_W,maxWidth:NAME_W}}>利用者名</th>
             {months.map((m,i)=>{
               const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
               const isJan=m.getMonth()===0;const isFirst=i===0;
