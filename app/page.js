@@ -17,6 +17,11 @@ const CAL_CONFIG = {
   long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
   short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: 'ﾌﾟﾗﾝ交付' },
 };
+const GANTT_BAR_COLORS = {
+  nintei_end: { bar: '#2d5a7b', light: '#d4e4ef' },
+  long_end:   { bar: '#5a8a5e', light: '#d8ead8' },
+  short_end:  { bar: '#8b6914', light: '#f0e6cc' },
+};
 
 function getDaysUntil(dateStr) { if (!dateStr) return null; const today = new Date(); today.setHours(0,0,0,0); const n = typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; return Math.floor((new Date(n+'T00:00:00')-today)/(1000*60*60*24)); }
 function getStatus(days) { if(days===null)return null; if(days<0)return'expired'; if(days<=30)return'warning'; if(days<=75)return'caution'; return'safe'; }
@@ -37,13 +42,11 @@ function parseYearMonthToLastDay(input) {
   if(!input||!input.trim())return null;
   const s=input.trim().replace(/[／]/g,'/').replace(/[ー−]/g,'-');
   let year,month;
-  // 令和対応: R8/4, r8/4, R08/04 など
   const reiwa=s.match(/^[Rr](\d{1,2})[\/\-](\d{1,2})$/);
   if(reiwa){
     year=parseInt(reiwa[1],10)+2018;
     month=parseInt(reiwa[2],10);
   }else{
-    // 西暦: 2026/4, 2026-04 など
     const seireki=s.match(/^(\d{4})[\/\-](\d{1,2})$/);
     if(!seireki)return null;
     year=parseInt(seireki[1],10);
@@ -85,6 +88,146 @@ function YearMonthShortcut({onApply}){
   );
 }
 
+function GanttChart({clients,onEditClient}){
+  const today=new Date();today.setHours(0,0,0,0);
+  const MONTHS=12;
+  const MON_W=80;
+  const NAME_W=100;
+  const ROW_H=20;
+  const CLIENT_GAP=4;
+  const HEADER_H=32;
+
+  const startDate=new Date(today.getFullYear(),today.getMonth(),1);
+  const months=useMemo(()=>{const arr=[];for(let i=0;i<MONTHS;i++){const d=new Date(startDate.getFullYear(),startDate.getMonth()+i,1);arr.push(d);}return arr;},[]);
+  const endDate=new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0);
+  const totalDays=(endDate-startDate)/(1000*60*60*24);
+  const chartW=MON_W*MONTHS;
+
+  const dayToX=(date)=>{const d=new Date(typeof date==='string'?date+'T00:00:00':date);const diff=(d-startDate)/(1000*60*60*24);return Math.max(0,Math.min(chartW,(diff/totalDays)*chartW));};
+  const todayX=dayToX(today);
+
+  const ganttClients=useMemo(()=>{
+    return clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{
+      const pa={expired:0,warning:1,caution:2,safe:3};
+      const wa=getWorstStatus(a),wb=getWorstStatus(b);
+      const sa=wa===null?99:(pa[wa]??5),sb=wb===null?99:(pa[wb]??5);
+      return sa-sb;
+    });
+  },[clients]);
+
+  const scrollRef=useRef(null);
+  useEffect(()=>{if(scrollRef.current){const scrollTo=Math.max(0,todayX-150);scrollRef.current.scrollLeft=scrollTo;}},[]);
+
+  const totalH=ganttClients.reduce((sum)=>sum+DEADLINE_TYPES.length*ROW_H+CLIENT_GAP+24,0)+HEADER_H;
+
+  return(
+    <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
+      <div style={{display:'flex',marginBottom:12,padding:'10px 12px 0',gap:12,flexWrap:'wrap'}}>
+        {DEADLINE_TYPES.map(dt=>(
+          <span key={dt.key} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:T.sub}}>
+            <span style={{display:'inline-block',width:12,height:8,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>
+            {dt.short}
+          </span>
+        ))}
+        <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#c0392b'}}>
+          <span style={{display:'inline-block',width:1,height:10,background:'#c0392b'}}/>今日
+        </span>
+      </div>
+      <div style={{display:'flex'}}>
+        {/* 名前列（固定） */}
+        <div style={{flexShrink:0,width:NAME_W,borderRight:'1px solid #d8d8d0',background:'#fafaf8'}}>
+          <div style={{height:HEADER_H,borderBottom:'1px solid #d8d8d0',padding:'0 8px',display:'flex',alignItems:'center'}}>
+            <span style={{fontSize:11,fontWeight:600,color:T.accent}}>利用者名</span>
+          </div>
+          {ganttClients.map(client=>{
+            const ws=getWorstStatus(client);
+            const worstColor=ws?STATUS_CONFIG[ws].color:T.muted;
+            return(
+              <div key={client.id} style={{borderBottom:'1px solid #eceae3'}}>
+                <div style={{padding:'4px 8px 2px',borderLeft:`3px solid ${worstColor}`}}>
+                  <div onClick={()=>onEditClient(client)} style={{fontSize:11,fontWeight:600,color:T.text,cursor:'pointer',lineHeight:1.3}} title="クリックして編集">{client.name}</div>
+                  <div style={{fontSize:9,color:T.muted,marginBottom:2}}>{client.care_manager||''}</div>
+                </div>
+                {DEADLINE_TYPES.map(dt=>(
+                  <div key={dt.key} style={{height:ROW_H,display:'flex',alignItems:'center',padding:'0 8px'}}>
+                    <span style={{fontSize:9,color:T.muted}}>{dt.short}</span>
+                  </div>
+                ))}
+                <div style={{height:CLIENT_GAP}}/>
+              </div>
+            );
+          })}
+        </div>
+        {/* チャート部分（スクロール） */}
+        <div ref={scrollRef} style={{flex:1,overflowX:'auto',overflowY:'hidden'}}>
+          <div style={{minWidth:chartW,position:'relative'}}>
+            {/* 月ヘッダー */}
+            <div style={{display:'flex',height:HEADER_H,borderBottom:'1px solid #d8d8d0'}}>
+              {months.map((m,i)=>{
+                const isCurrentMonth=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
+                return(
+                  <div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
+                    borderRight:'1px solid #eceae3',fontSize:11,fontWeight:isCurrentMonth?700:400,
+                    color:isCurrentMonth?T.accent:T.muted,background:isCurrentMonth?'#e8f0f5':'transparent'}}>
+                    {m.getMonth()+1}月
+                  </div>
+                );
+              })}
+            </div>
+            {/* クライアント行 */}
+            {ganttClients.map(client=>(
+              <div key={client.id} style={{borderBottom:'1px solid #eceae3',position:'relative'}}>
+                <div style={{padding:'4px 0 2px',height:16}}/>
+                <div style={{fontSize:9,color:'transparent',marginBottom:2,height:10}}>&nbsp;</div>
+                {DEADLINE_TYPES.map(dt=>{
+                  const dateStr=client[dt.key];
+                  const days=getDaysUntil(dateStr);
+                  const status=getStatus(days);
+                  if(!dateStr) return <div key={dt.key} style={{height:ROW_H}}/>;
+                  const endX=dayToX(dateStr);
+                  const barStart=0;
+                  const barWidth=Math.max(2,endX-barStart);
+                  let barColor=GANTT_BAR_COLORS[dt.key].bar;
+                  if(status==='expired')barColor='#c0392b';
+                  else if(status==='warning')barColor='#d35400';
+                  else if(status==='caution')barColor='#8b6914';
+                  const d=new Date(dateStr+'T00:00:00');
+                  const label=`${d.getMonth()+1}/${d.getDate()}`;
+                  return(
+                    <div key={dt.key} style={{height:ROW_H,position:'relative',display:'flex',alignItems:'center'}}>
+                      <div onClick={()=>onEditClient(client)}
+                        title={`${DEADLINE_TYPES.find(x=>x.key===dt.key).label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):''})`}
+                        style={{position:'absolute',left:barStart,width:barWidth,height:12,borderRadius:3,
+                          background:barColor,opacity:0.85,cursor:'pointer',transition:'opacity 0.15s'}}
+                        onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                        onMouseLeave={e=>e.currentTarget.style.opacity='0.85'}
+                      />
+                      {endX>10&&endX<chartW-5&&(
+                        <span style={{position:'absolute',left:endX+3,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{label}</span>
+                      )}
+                    </div>
+                  );
+                })}
+                <div style={{height:CLIENT_GAP}}/>
+                {/* 月区切り線 */}
+                {months.map((m,i)=>i>0&&(
+                  <div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#eceae3',pointerEvents:'none'}}/>
+                ))}
+              </div>
+            ))}
+            {/* 今日線 */}
+            <div style={{position:'absolute',top:0,bottom:0,left:todayX,width:2,background:'#c0392b',opacity:0.6,pointerEvents:'none',zIndex:5}}/>
+            <div style={{position:'absolute',top:2,left:todayX-8,fontSize:8,color:'#c0392b',fontWeight:700,pointerEvents:'none',zIndex:5}}>今日</div>
+          </div>
+        </div>
+      </div>
+      {ganttClients.length===0&&(
+        <div style={{textAlign:'center',padding:30,color:T.muted,fontSize:13}}>期限が設定されている利用者がいません</div>
+      )}
+    </div>
+  );
+}
+
 const T = { bg:'#f5f3ee', accent:'#2d5a7b', text:'#1a1a2e', sub:'#4a4a5a', muted:'#8888a0', border:'#d8d8d0',
   card:{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,padding:'16px 20px',marginBottom:12,boxShadow:'0 1px 3px rgba(0,0,0,.06)'},
   barStyle:{display:'inline-block',width:3,height:16,background:'#2d5a7b',borderRadius:2},
@@ -99,6 +242,8 @@ const GearIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="non
 const EyeIcon = ({show}) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8888a0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{show?<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>:<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></>}</svg>;
 const CopyIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
 const CheckIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+const GanttIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="14" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="10" height="4" rx="1"/></svg>;
+const ListIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
 
 function DaysBadge({days}){if(days===null)return<span style={{fontSize:11,color:T.muted,padding:'2px 8px',borderRadius:4,background:'#eceae3'}}>未設定</span>;const s=getStatus(days),c=STATUS_CONFIG[s];return<span style={{fontSize:11,fontWeight:600,color:c.color,background:c.bg,padding:'2px 8px',borderRadius:4}}>{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>;}
 function DeadlineSummaryInline({days,label}){if(days===null)return<span style={{fontSize:12,color:T.muted}}>{label}:未設定</span>;const s=getStatus(days),c=STATUS_CONFIG[s];return<span style={{fontSize:12,color:c.color,fontWeight:600}}>{label}:{s==='expired'?`${Math.abs(days)}日超過`:`あと${days}日`}</span>;}
@@ -142,7 +287,6 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
   const[saving,setSaving]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
 
   useEffect(()=>{if(managerList.length>0&&!careManager){const s=localStorage.getItem('kigen-reg-cm')||'';const v=managerList.includes(s)?s:managerList[0];setCareManager(v);}},[managerList,careManager]);
-
   const handleCMChange=(v)=>{setCareManager(v);setError('');setSuccess('');try{localStorage.setItem('kigen-reg-cm',v);}catch{}};
 
   const handleSubmit=async()=>{
@@ -150,20 +294,9 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
     if(!careManager){setError('担当ケアマネジャーを選択してください');return;}
     setSaving(true);setError('');setSuccess('');
     try{
-      const res=await fetch('/api/clients',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-pin':pin},
-        body:JSON.stringify({name:name.trim(),care_manager:careManager,nintei_end:ninteiEnd||null,long_end:longEnd||null,short_end:shortEnd||null})
-      });
-      if(res.ok){
-        const data=await res.json();
-        setSuccess(`${data.client.name} さんを登録しました`);
-        setName('');setNinteiEnd('');setLongEnd('');setShortEnd('');
-        onRegistered(data.client);
-      }else{
-        const data=await res.json();
-        setError(data.error||'登録に失敗しました');
-      }
+      const res=await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({name:name.trim(),care_manager:careManager,nintei_end:ninteiEnd||null,long_end:longEnd||null,short_end:shortEnd||null})});
+      if(res.ok){const data=await res.json();setSuccess(`${data.client.name} さんを登録しました`);setName('');setNinteiEnd('');setLongEnd('');setShortEnd('');onRegistered(data.client);}
+      else{const data=await res.json();setError(data.error||'登録に失敗しました');}
     }catch{setError('接続エラー');}
     setSaving(false);
   };
@@ -175,59 +308,21 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
     <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
-            {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <button onClick={onBack} style={T.btnBack}>← 戻る</button>
-            {gearMenu}
-          </div>
+          <div style={{display:'flex',alignItems:'center',gap:12}}><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>{isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}</div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={onBack} style={T.btnBack}>← 戻る</button>{gearMenu}</div>
         </div>
-
         <div style={{fontWeight:700,fontSize:16,color:T.text,marginBottom:16}}>利用者登録</div>
-
         {error&&<div style={{padding:'10px 16px',background:'#fdf0ee',border:'1px solid #e8c8c8',borderRadius:6,marginBottom:16,fontSize:13,color:'#c0392b'}}>{error}</div>}
         {success&&<div style={{padding:'10px 16px',background:'#e8f5f0',border:'1px solid #b8ddd0',borderRadius:6,marginBottom:16,fontSize:13,color:'#27766a'}}>✓ {success}</div>}
-
         <div style={T.card}>
-          <div style={{marginBottom:16}}>
-            <label style={labelStyle}>利用者名 <span style={{color:'#c0392b'}}>*</span></label>
-            <input type="text" value={name} onChange={e=>{setName(e.target.value);setError('');setSuccess('');}} placeholder="例：山田 太郎" style={inputStyle}/>
-          </div>
-
-          <div style={{marginBottom:16}}>
-            <label style={labelStyle}>担当ケアマネジャー <span style={{color:'#c0392b'}}>*</span></label>
-            <select value={careManager} onChange={e=>handleCMChange(e.target.value)} style={{...inputStyle,appearance:'auto'}}>
-              {managerList.map(m=><option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-
-          <div style={{borderTop:'1px solid #eceae3',paddingTop:16,marginTop:8,marginBottom:16}}>
-            <div style={T.secTitle}><span style={T.barStyle}></span>期限設定（任意）</div>
-          </div>
-
-          <div style={{marginBottom:16}}>
-            <label style={labelStyle}>認定期限</label>
-            <YearMonthShortcut onApply={v=>setNinteiEnd(v)}/>
-            <input type="date" value={ninteiEnd} onChange={e=>setNinteiEnd(e.target.value)} style={inputStyle}/>
-          </div>
-          <div style={{marginBottom:16}}>
-            <label style={labelStyle}>長期期限</label>
-            <YearMonthShortcut onApply={v=>setLongEnd(v)}/>
-            <input type="date" value={longEnd} onChange={e=>setLongEnd(e.target.value)} style={inputStyle}/>
-          </div>
-          <div style={{marginBottom:16}}>
-            <label style={labelStyle}>短期期限</label>
-            <YearMonthShortcut onApply={v=>setShortEnd(v)}/>
-            <input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/>
-          </div>
+          <div style={{marginBottom:16}}><label style={labelStyle}>利用者名 <span style={{color:'#c0392b'}}>*</span></label><input type="text" value={name} onChange={e=>{setName(e.target.value);setError('');setSuccess('');}} placeholder="例：山田 太郎" style={inputStyle}/></div>
+          <div style={{marginBottom:16}}><label style={labelStyle}>担当ケアマネジャー <span style={{color:'#c0392b'}}>*</span></label><select value={careManager} onChange={e=>handleCMChange(e.target.value)} style={{...inputStyle,appearance:'auto'}}>{managerList.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+          <div style={{borderTop:'1px solid #eceae3',paddingTop:16,marginTop:8,marginBottom:16}}><div style={T.secTitle}><span style={T.barStyle}></span>期限設定（任意）</div></div>
+          <div style={{marginBottom:16}}><label style={labelStyle}>認定期限</label><YearMonthShortcut onApply={v=>setNinteiEnd(v)}/><input type="date" value={ninteiEnd} onChange={e=>setNinteiEnd(e.target.value)} style={inputStyle}/></div>
+          <div style={{marginBottom:16}}><label style={labelStyle}>長期期限</label><YearMonthShortcut onApply={v=>setLongEnd(v)}/><input type="date" value={longEnd} onChange={e=>setLongEnd(e.target.value)} style={inputStyle}/></div>
+          <div style={{marginBottom:16}}><label style={labelStyle}>短期期限</label><YearMonthShortcut onApply={v=>setShortEnd(v)}/><input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/></div>
         </div>
-
-        <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}>
-          <button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button>
-        </div>
-
+        <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}><button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button></div>
         <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
       </div>
     </div>
@@ -242,6 +337,7 @@ export default function KigenKanri(){
   const[showGearMenu,setShowGearMenu]=useState(false);const[mode,setMode]=useState('list');
   const[allManagers,setAllManagers]=useState([]);
   const[copiedManager,setCopiedManager]=useState(null);
+  const[viewMode,setViewMode]=useState('list');
   const gearRef=useRef(null);
 
   useEffect(()=>{const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);
@@ -312,27 +408,16 @@ export default function KigenKanri(){
       <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
         <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-            <div style={{display:'flex',alignItems:'center',gap:12}}>
-              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
-              <span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <button onClick={()=>setMode('list')} style={T.btnBack}>← 戻る</button>
-              {gearMenu}
-            </div>
+            <div style={{display:'flex',alignItems:'center',gap:12}}><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span></div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={()=>setMode('list')} style={T.btnBack}>← 戻る</button>{gearMenu}</div>
           </div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
             <div style={{fontSize:16,fontWeight:700,color:T.text}}>カレンダー連携設定</div>
-            {managerFilter!=='all'&&(
-              <span style={{fontSize:11,color:T.accent,background:'#e8f0f5',padding:'3px 10px',borderRadius:4,fontWeight:500}}>
-                絞込中: {managerFilter}
-              </span>
-            )}
+            {managerFilter!=='all'&&(<span style={{fontSize:11,color:T.accent,background:'#e8f0f5',padding:'3px 10px',borderRadius:4,fontWeight:500}}>絞込中: {managerFilter}</span>)}
           </div>
           <div style={T.card}>
             <div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div>
-            <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>
-              ☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
+            <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               {calSyncManagers.map(m=>{const isSynced=!!calSyncMap[m];const isCopied=copiedManager===m; return(
                 <div key={m} style={{borderRadius:8,background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`,overflow:'hidden'}}>
@@ -380,11 +465,21 @@ export default function KigenKanri(){
           </div>
         </div>
 
-        <div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
-          <span style={T.barStyle}></span>検索
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',display:'flex',alignItems:'center',gap:8}}>
+            <span style={T.barStyle}></span>検索
+          </div>
+          <div style={{display:'flex',gap:2,background:'#eceae3',borderRadius:6,padding:2}}>
+            <button onClick={()=>setViewMode('list')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='list'?'#fff':'transparent',color:viewMode==='list'?T.accent:T.muted,boxShadow:viewMode==='list'?'0 1px 2px rgba(0,0,0,.1)':'none'}}>
+              <ListIcon/>一覧
+            </button>
+            <button onClick={()=>setViewMode('gantt')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='gantt'?'#fff':'transparent',color:viewMode==='gantt'?T.accent:T.muted,boxShadow:viewMode==='gantt'?'0 1px 2px rgba(0,0,0,.1)':'none'}}>
+              <GanttIcon/>ガント
+            </button>
+          </div>
         </div>
         <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
-          {FILTER_ITEMS.map(item=>(
+          {viewMode==='list'&&FILTER_ITEMS.map(item=>(
             <button key={item.key} onClick={()=>setActiveFilter(item.key)} style={{
               flexShrink:0,padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',
               background:activeFilter===item.key?item.color:'#fff',
@@ -394,66 +489,72 @@ export default function KigenKanri(){
           ))}
           {managers.length>1&&(
             <select value={managerFilter} onChange={e=>handleManagerFilterChange(e.target.value)}
-              style={{padding:'6px 12px',fontSize:12,borderRadius:6,border:'1px solid #d8d8d0',background:'#fff',color:T.text,outline:'none',marginLeft:'auto'}}>
+              style={{padding:'6px 12px',fontSize:12,borderRadius:6,border:'1px solid #d8d8d0',background:'#fff',color:T.text,outline:'none',marginLeft:viewMode==='list'?'auto':0}}>
               <option value="all">全ケアマネ</option>
               {managers.map(m=><option key={m} value={m}>{m}</option>)}
             </select>
           )}
         </div>
 
-        {(summary.expired>0||summary.warning>0)&&(
-          <div style={{...T.card,padding:'12px 16px',marginBottom:16,background:'#fdf0ee',border:'1px solid #e8c8c8',display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:22}}>⚠️</span>
-            <div>
-              <p style={{margin:0,fontSize:13,fontWeight:600,color:'#c0392b'}}>要対応: {summary.expired+summary.warning}名</p>
-              <p style={{margin:'2px 0 0',fontSize:11,color:'#8b6914'}}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p>
-            </div>
-          </div>
-        )}
-
-        <div style={{borderTop:'1px solid #d8d8d0',paddingTop:12,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <span style={{fontSize:14,fontWeight:600,color:T.accent}}>検索結果</span>
-          <span style={{fontSize:12,color:T.muted,background:'#eceae3',padding:'2px 10px',borderRadius:10,fontWeight:500}}>{filteredSortedClients.length}名</span>
-        </div>
-
-        <div style={{display:'flex',flexDirection:'column',gap:4}}>
-        {filteredSortedClients.map(client=>{
-          const deadlines=DEADLINE_TYPES.map(dt=>({...dt,date:client[dt.key],days:getDaysUntil(client[dt.key]),status:getStatus(getDaysUntil(client[dt.key]))}));
-          const worstInfo=client.worstStatus?STATUS_CONFIG[client.worstStatus]:{color:T.muted,bg:'#eceae3',label:'未設定'};
-          const isExpanded=expandedClient===client.id;
-          const showCalendar=!!calSyncMap[client.care_manager];
-          const visibleCalKeys=getVisibleCalendarKeys(client);
-          return(
-            <div key={client.id} style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:6,borderLeft:`4px solid ${worstInfo.color}`,overflow:'hidden',boxShadow:'0 1px 2px rgba(0,0,0,.04)'}}>
-              <div onClick={()=>setExpandedClient(isExpanded?null:client.id)} style={{padding:'8px 16px',cursor:'pointer',display:'flex',alignItems:'center'}}>
-                <span style={{fontSize:14,fontWeight:600,minWidth:100,flexShrink:0}}>{client.name}</span>
-                <span style={{fontSize:10,fontWeight:600,color:worstInfo.color,background:worstInfo.bg,padding:'2px 8px',borderRadius:4,flexShrink:0,marginRight:10}}>{worstInfo.label}</span>
-                {client.care_manager&&<span style={{fontSize:12,color:T.muted,flexShrink:0,marginRight:16}}>担当:{client.care_manager}</span>}
-                <span style={{display:'flex',gap:12,alignItems:'center',flex:1,justifyContent:'flex-end',marginRight:8}}>
-                  {DEADLINE_TYPES.map(dt=><DeadlineSummaryInline key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short}/>)}
-                </span>
-                <span style={{fontSize:13,color:T.muted,flexShrink:0,transform:isExpanded?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
-              </div>
-              {isExpanded&&(
-                <div style={{padding:'0 16px 14px',borderTop:'1px solid #eceae3'}}>
-                  {deadlines.map(dl=>(
-                    <div key={dl.key} style={{padding:'10px 0',borderBottom:'1px solid #f0efe8'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <div><span style={{fontSize:12,fontWeight:600,color:T.sub}}>{dl.label}</span><span style={{fontSize:11,color:T.muted,marginLeft:8}}>{formatDate(dl.date)}</span></div>
-                        <DaysBadge days={dl.days}/>
-                      </div>
-                      {showCalendar&&visibleCalKeys.includes(dl.key)&&<CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date}/>}
-                    </div>
-                  ))}
-                  <button onClick={()=>setEditClient(client)} style={{width:'100%',padding:10,marginTop:10,...T.btnSecondary,fontSize:13}}>期限を編集</button>
+        {viewMode==='gantt'?(
+          <GanttChart clients={filteredClients} onEditClient={c=>setEditClient(c)}/>
+        ):(
+          <>
+            {(summary.expired>0||summary.warning>0)&&(
+              <div style={{...T.card,padding:'12px 16px',marginBottom:16,background:'#fdf0ee',border:'1px solid #e8c8c8',display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:22}}>⚠️</span>
+                <div>
+                  <p style={{margin:0,fontSize:13,fontWeight:600,color:'#c0392b'}}>要対応: {summary.expired+summary.warning}名</p>
+                  <p style={{margin:'2px 0 0',fontSize:11,color:'#8b6914'}}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p>
                 </div>
-              )}
+              </div>
+            )}
+
+            <div style={{borderTop:'1px solid #d8d8d0',paddingTop:12,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontSize:14,fontWeight:600,color:T.accent}}>検索結果</span>
+              <span style={{fontSize:12,color:T.muted,background:'#eceae3',padding:'2px 10px',borderRadius:10,fontWeight:500}}>{filteredSortedClients.length}名</span>
             </div>
-          );
-        })}
-        </div>
-        {filteredSortedClients.length===0&&(
-          <div style={{textAlign:'center',padding:40,color:T.muted}}><div style={{fontSize:40,marginBottom:12}}>📋</div><p>該当する利用者はいません</p></div>
+
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {filteredSortedClients.map(client=>{
+              const deadlines=DEADLINE_TYPES.map(dt=>({...dt,date:client[dt.key],days:getDaysUntil(client[dt.key]),status:getStatus(getDaysUntil(client[dt.key]))}));
+              const worstInfo=client.worstStatus?STATUS_CONFIG[client.worstStatus]:{color:T.muted,bg:'#eceae3',label:'未設定'};
+              const isExpanded=expandedClient===client.id;
+              const showCalendar=!!calSyncMap[client.care_manager];
+              const visibleCalKeys=getVisibleCalendarKeys(client);
+              return(
+                <div key={client.id} style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:6,borderLeft:`4px solid ${worstInfo.color}`,overflow:'hidden',boxShadow:'0 1px 2px rgba(0,0,0,.04)'}}>
+                  <div onClick={()=>setExpandedClient(isExpanded?null:client.id)} style={{padding:'8px 16px',cursor:'pointer',display:'flex',alignItems:'center'}}>
+                    <span style={{fontSize:14,fontWeight:600,minWidth:100,flexShrink:0}}>{client.name}</span>
+                    <span style={{fontSize:10,fontWeight:600,color:worstInfo.color,background:worstInfo.bg,padding:'2px 8px',borderRadius:4,flexShrink:0,marginRight:10}}>{worstInfo.label}</span>
+                    {client.care_manager&&<span style={{fontSize:12,color:T.muted,flexShrink:0,marginRight:16}}>担当:{client.care_manager}</span>}
+                    <span style={{display:'flex',gap:12,alignItems:'center',flex:1,justifyContent:'flex-end',marginRight:8}}>
+                      {DEADLINE_TYPES.map(dt=><DeadlineSummaryInline key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short}/>)}
+                    </span>
+                    <span style={{fontSize:13,color:T.muted,flexShrink:0,transform:isExpanded?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
+                  </div>
+                  {isExpanded&&(
+                    <div style={{padding:'0 16px 14px',borderTop:'1px solid #eceae3'}}>
+                      {deadlines.map(dl=>(
+                        <div key={dl.key} style={{padding:'10px 0',borderBottom:'1px solid #f0efe8'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <div><span style={{fontSize:12,fontWeight:600,color:T.sub}}>{dl.label}</span><span style={{fontSize:11,color:T.muted,marginLeft:8}}>{formatDate(dl.date)}</span></div>
+                            <DaysBadge days={dl.days}/>
+                          </div>
+                          {showCalendar&&visibleCalKeys.includes(dl.key)&&<CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date}/>}
+                        </div>
+                      ))}
+                      <button onClick={()=>setEditClient(client)} style={{width:'100%',padding:10,marginTop:10,...T.btnSecondary,fontSize:13}}>期限を編集</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            </div>
+            {filteredSortedClients.length===0&&(
+              <div style={{textAlign:'center',padding:40,color:T.muted}}><div style={{fontSize:40,marginBottom:12}}>📋</div><p>該当する利用者はいません</p></div>
+            )}
+          </>
         )}
         <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
       </div>
