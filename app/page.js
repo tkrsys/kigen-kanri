@@ -19,14 +19,17 @@ const CAL_CONFIG = {
 };
 const GANTT_BAR_COLORS = { nintei_end:{bar:'#2d5a7b'}, long_end:{bar:'#5a8a5e'}, short_end:{bar:'#8b6914'} };
 
-function getDaysUntil(dateStr) { if (!dateStr) return null; const today = new Date(); today.setHours(0,0,0,0); const n = typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; return Math.floor((new Date(n+'T00:00:00')-today)/(1000*60*60*24)); }
+/* normalizeDate: ISO "2028-01-31T00:00:00.000Z" → "2028-01-31" を安全に取り出す */
+function nd(v){return typeof v==='string'?v.split('T')[0]:v;}
+
+function getDaysUntil(dateStr) { if (!dateStr) return null; const today = new Date(); today.setHours(0,0,0,0); const n=nd(dateStr); return Math.floor((new Date(n+'T00:00:00')-today)/(1000*60*60*24)); }
 function getStatus(days) { if(days===null)return null; if(days<0)return'expired'; if(days<=30)return'warning'; if(days<=75)return'caution'; return'safe'; }
-function formatDate(dateStr) { if(!dateStr)return'未設定'; const n=typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; const d=new Date(n+'T00:00:00'); return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }
-function toInputDate(dateStr) { if(!dateStr)return''; return typeof dateStr==='string'?dateStr.split('T')[0]:''; }
-function normalizeClientDate(dateStr) { if(!dateStr)return null; return typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; }
-function getNoticeDateStr(dateStr,mb) { const d=new Date(dateStr+'T00:00:00'); let y=d.getFullYear(),m=d.getMonth()-mb; if(m<0){m+=12;y-=1;} return`${y}-${String(m+1).padStart(2,'0')}-25`; }
-function getActionMonth(dateStr,offset) { const d=new Date(dateStr+'T00:00:00'); let m=d.getMonth()+1+offset; if(m<=0)m+=12; if(m>12)m-=12; return m; }
-function buildCalendarTitles(typeKey,userName,dateStr) { if(!dateStr)return null; const n=typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; const config=CAL_CONFIG[typeKey]; const d=new Date(n+'T00:00:00'); const endLabel=`${d.getMonth()+1}/${d.getDate()}`; const pre=getNoticeDateStr(n,2),mid=getNoticeDateStr(n,1),day=getNoticeDateStr(n,0); const pD=new Date(pre+'T00:00:00'),mD=new Date(mid+'T00:00:00'),dD=new Date(day+'T00:00:00'); return { pre:{date:`${pD.getMonth()+1}/${pD.getDate()}`,title:`【${config.label} 2ヶ月前】${userName} ${endLabel}(${getActionMonth(n,-1)}月 ${config.preAction})`}, mid:{date:`${mD.getMonth()+1}/${mD.getDate()}`,title:`【${config.label} 1ヶ月前】${userName} ${endLabel}(${getActionMonth(n,0)}月 ${config.midAction})`}, day:{date:`${dD.getMonth()+1}/${dD.getDate()}`,title:`【${config.label}　　　　】${userName} ${endLabel}`} }; }
+function formatDate(dateStr) { if(!dateStr)return'未設定'; const n=nd(dateStr); const d=new Date(n+'T00:00:00'); return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }
+function toInputDate(dateStr) { if(!dateStr)return''; return nd(dateStr); }
+function normalizeClientDate(dateStr) { if(!dateStr)return null; return nd(dateStr); }
+function getNoticeDateStr(dateStr,mb) { const d=new Date(nd(dateStr)+'T00:00:00'); let y=d.getFullYear(),m=d.getMonth()-mb; if(m<0){m+=12;y-=1;} return`${y}-${String(m+1).padStart(2,'0')}-25`; }
+function getActionMonth(dateStr,offset) { const d=new Date(nd(dateStr)+'T00:00:00'); let m=d.getMonth()+1+offset; if(m<=0)m+=12; if(m>12)m-=12; return m; }
+function buildCalendarTitles(typeKey,userName,dateStr) { if(!dateStr)return null; const n=nd(dateStr); const config=CAL_CONFIG[typeKey]; const d=new Date(n+'T00:00:00'); const endLabel=`${d.getMonth()+1}/${d.getDate()}`; const pre=getNoticeDateStr(n,2),mid=getNoticeDateStr(n,1),day=getNoticeDateStr(n,0); const pD=new Date(pre+'T00:00:00'),mD=new Date(mid+'T00:00:00'),dD=new Date(day+'T00:00:00'); return { pre:{date:`${pD.getMonth()+1}/${pD.getDate()}`,title:`【${config.label} 2ヶ月前】${userName} ${endLabel}(${getActionMonth(n,-1)}月 ${config.preAction})`}, mid:{date:`${mD.getMonth()+1}/${mD.getDate()}`,title:`【${config.label} 1ヶ月前】${userName} ${endLabel}(${getActionMonth(n,0)}月 ${config.midAction})`}, day:{date:`${dD.getMonth()+1}/${dD.getDate()}`,title:`【${config.label}　　　　】${userName} ${endLabel}`} }; }
 function getWorstStatus(client) { const p={expired:0,warning:1,caution:2,safe:3}; let w=null; for(const dt of DEADLINE_TYPES){const s=getStatus(getDaysUntil(client[dt.key]));if(s===null)continue;if(w===null||p[s]<p[w])w=s;} return w; }
 function getClientStatuses(client) { const s=new Set(); for(const dt of DEADLINE_TYPES){const st=getStatus(getDaysUntil(client[dt.key]));if(st!==null)s.add(st);} return s; }
 function hasAnyDeadline(client) { return DEADLINE_TYPES.some(dt=>client[dt.key]); }
@@ -49,7 +52,8 @@ function GanttChart({clients,onEditClient}){
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
   const totalDays=(endDate-startDate)/86400000;
   const chartW=MON_W*MONTHS;
-  const dayToX=dv=>{const d=new Date(typeof dv==='string'?dv+'T00:00:00':dv);return((d-startDate)/86400000/totalDays)*chartW;};
+  /* ★修正: nd()でISO文字列を正規化してからDate生成 */
+  const dayToX=dv=>{const n=nd(dv);const d=new Date(typeof n==='string'?n+'T00:00:00':n);return((d-startDate)/86400000/totalDays)*chartW;};
   const todayX=dayToX(today);
   const ganttClients=useMemo(()=>{const p={expired:0,warning:1,caution:2,safe:3};return clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{const wa=getWorstStatus(a),wb=getWorstStatus(b);return(wa===null?99:p[wa]??5)-(wb===null?99:p[wb]??5);});},[clients]);
   const scrollRef=useRef(null);
@@ -67,7 +71,8 @@ function GanttChart({clients,onEditClient}){
     const barStartX=Math.max(0,Math.min(chartW,todayX));
     let barColor=GANTT_BAR_COLORS[dt.key].bar;
     if(status==='expired')barColor='#c0392b';else if(status==='warning')barColor='#d35400';else if(status==='caution')barColor='#b8860b';
-    const d=new Date(dateStr+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
+    /* ★修正: nd()でISO文字列を正規化 */
+    const d=new Date(nd(dateStr)+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
     const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
     if(status==='expired'){return<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(ROW_H-BAR_H)/2,width:6,height:BAR_H,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(ROW_H-12)/2,fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;}
     const bw=Math.max(3,endX-barStartX);
