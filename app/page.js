@@ -36,10 +36,19 @@ function getCalendarFeedUrl(managerName) { const base='https://careplan-kigen.ve
 function parseYearMonthToLastDay(input) {
   if(!input||!input.trim())return null;
   const s=input.trim().replace(/[／]/g,'/').replace(/[ー−]/g,'-');
-  const m1=s.match(/^(\d{4})[\/\-](\d{1,2})$/);
-  if(!m1)return null;
-  const year=parseInt(m1[1],10);
-  const month=parseInt(m1[2],10);
+  let year,month;
+  // 令和対応: R8/4, r8/4, R08/04 など
+  const reiwa=s.match(/^[Rr](\d{1,2})[\/\-](\d{1,2})$/);
+  if(reiwa){
+    year=parseInt(reiwa[1],10)+2018;
+    month=parseInt(reiwa[2],10);
+  }else{
+    // 西暦: 2026/4, 2026-04 など
+    const seireki=s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+    if(!seireki)return null;
+    year=parseInt(seireki[1],10);
+    month=parseInt(seireki[2],10);
+  }
   if(month<1||month>12||year<2000||year>2100)return null;
   const lastDay=new Date(year,month,0).getDate();
   return`${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
@@ -57,7 +66,7 @@ function YearMonthShortcut({onApply}){
       setVal('');
       setTimeout(()=>setMsg(null),2000);
     }else{
-      setMsg({ok:false,text:'例: 2026/4'});
+      setMsg({ok:false,text:'例: 2026/4 or R8/4'});
       setTimeout(()=>setMsg(null),2000);
     }
   };
@@ -65,8 +74,8 @@ function YearMonthShortcut({onApply}){
     <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
       <input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}}
         onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}}
-        placeholder="年/月 → 末日" inputMode="numeric"
-        style={{width:110,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/>
+        placeholder="年/月 or R8/4 → 末日"
+        style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/>
       <button type="button" onClick={handleApply}
         style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>
         末日設定
