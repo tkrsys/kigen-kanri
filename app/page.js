@@ -18,9 +18,9 @@ const CAL_CONFIG = {
   short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: 'ﾌﾟﾗﾝ交付' },
 };
 const GANTT_BAR_COLORS = {
-  nintei_end: { bar: '#2d5a7b', light: '#d4e4ef' },
-  long_end:   { bar: '#5a8a5e', light: '#d8ead8' },
-  short_end:  { bar: '#8b6914', light: '#f0e6cc' },
+  nintei_end: { bar: '#2d5a7b' },
+  long_end:   { bar: '#5a8a5e' },
+  short_end:  { bar: '#8b6914' },
 };
 
 function getDaysUntil(dateStr) { if (!dateStr) return null; const today = new Date(); today.setHours(0,0,0,0); const n = typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; return Math.floor((new Date(n+'T00:00:00')-today)/(1000*60*60*24)); }
@@ -43,46 +43,24 @@ function parseYearMonthToLastDay(input) {
   const s=input.trim().replace(/[／]/g,'/').replace(/[ー−]/g,'-');
   let year,month;
   const reiwa=s.match(/^[Rr](\d{1,2})[\/\-](\d{1,2})$/);
-  if(reiwa){
-    year=parseInt(reiwa[1],10)+2018;
-    month=parseInt(reiwa[2],10);
-  }else{
-    const seireki=s.match(/^(\d{4})[\/\-](\d{1,2})$/);
-    if(!seireki)return null;
-    year=parseInt(seireki[1],10);
-    month=parseInt(seireki[2],10);
-  }
+  if(reiwa){ year=parseInt(reiwa[1],10)+2018; month=parseInt(reiwa[2],10); }
+  else{ const seireki=s.match(/^(\d{4})[\/\-](\d{1,2})$/); if(!seireki)return null; year=parseInt(seireki[1],10); month=parseInt(seireki[2],10); }
   if(month<1||month>12||year<2000||year>2100)return null;
   const lastDay=new Date(year,month,0).getDate();
   return`${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
 }
 
 function YearMonthShortcut({onApply}){
-  const[val,setVal]=useState('');
-  const[msg,setMsg]=useState(null);
+  const[val,setVal]=useState('');const[msg,setMsg]=useState(null);
   const handleApply=()=>{
     const result=parseYearMonthToLastDay(val);
-    if(result){
-      onApply(result);
-      const d=new Date(result+'T00:00:00');
-      setMsg({ok:true,text:`→ ${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} を設定`});
-      setVal('');
-      setTimeout(()=>setMsg(null),2000);
-    }else{
-      setMsg({ok:false,text:'例: 2026/4 or R8/4'});
-      setTimeout(()=>setMsg(null),2000);
-    }
+    if(result){ onApply(result); const d=new Date(result+'T00:00:00'); setMsg({ok:true,text:`→ ${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} を設定`}); setVal(''); setTimeout(()=>setMsg(null),2000); }
+    else{ setMsg({ok:false,text:'例: 2026/4 or R8/4'}); setTimeout(()=>setMsg(null),2000); }
   };
   return(
     <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
-      <input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}}
-        onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}}
-        placeholder="年/月 or R8/4 → 末日"
-        style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/>
-      <button type="button" onClick={handleApply}
-        style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>
-        末日設定
-      </button>
+      <input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}} placeholder="年/月 or R8/4 → 末日" style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/>
+      <button type="button" onClick={handleApply} style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>末日設定</button>
       {msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}
     </div>
   );
@@ -92,138 +70,126 @@ function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
   const MONTHS=12;
   const MON_W=80;
-  const NAME_W=100;
-  const ROW_H=20;
-  const CLIENT_GAP=4;
-  const HEADER_H=32;
+  const NAME_W=110;
+  const BAR_ROW_H=22;
+  const HEADER_H=30;
 
-  const startDate=new Date(today.getFullYear(),today.getMonth(),1);
-  const months=useMemo(()=>{const arr=[];for(let i=0;i<MONTHS;i++){const d=new Date(startDate.getFullYear(),startDate.getMonth()+i,1);arr.push(d);}return arr;},[]);
-  const endDate=new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0);
-  const totalDays=(endDate-startDate)/(1000*60*60*24);
+  const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
+  const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
+  const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
+  const totalDays=(endDate-startDate)/(86400000);
   const chartW=MON_W*MONTHS;
 
-  const dayToX=(date)=>{const d=new Date(typeof date==='string'?date+'T00:00:00':date);const diff=(d-startDate)/(1000*60*60*24);return Math.max(0,Math.min(chartW,(diff/totalDays)*chartW));};
+  const dayToX=(dateVal)=>{const d=new Date(typeof dateVal==='string'?dateVal+'T00:00:00':dateVal);const diff=(d-startDate)/86400000;return(diff/totalDays)*chartW;};
   const todayX=dayToX(today);
 
   const ganttClients=useMemo(()=>{
+    const priority={expired:0,warning:1,caution:2,safe:3};
     return clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{
-      const pa={expired:0,warning:1,caution:2,safe:3};
       const wa=getWorstStatus(a),wb=getWorstStatus(b);
-      const sa=wa===null?99:(pa[wa]??5),sb=wb===null?99:(pa[wb]??5);
-      return sa-sb;
+      return (wa===null?99:priority[wa]??5)-(wb===null?99:priority[wb]??5);
     });
   },[clients]);
 
   const scrollRef=useRef(null);
-  useEffect(()=>{if(scrollRef.current){const scrollTo=Math.max(0,todayX-150);scrollRef.current.scrollLeft=scrollTo;}},[]);
+  useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollLeft=Math.max(0,todayX-120);},[]);
 
-  const totalH=ganttClients.reduce((sum)=>sum+DEADLINE_TYPES.length*ROW_H+CLIENT_GAP+24,0)+HEADER_H;
+  if(ganttClients.length===0) return <div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
 
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
-      <div style={{display:'flex',marginBottom:12,padding:'10px 12px 0',gap:12,flexWrap:'wrap'}}>
-        {DEADLINE_TYPES.map(dt=>(
-          <span key={dt.key} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:T.sub}}>
-            <span style={{display:'inline-block',width:12,height:8,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>
-            {dt.short}
-          </span>
-        ))}
-        <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#c0392b'}}>
-          <span style={{display:'inline-block',width:1,height:10,background:'#c0392b'}}/>今日
-        </span>
+      {/* 凡例 */}
+      <div style={{display:'flex',padding:'8px 12px',gap:14,flexWrap:'wrap',borderBottom:'1px solid #eceae3'}}>
+        {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#4a4a5a'}}><span style={{display:'inline-block',width:14,height:8,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
+        <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:10,background:'#c0392b'}}/>今日</span>
       </div>
       <div style={{display:'flex'}}>
-        {/* 名前列（固定） */}
-        <div style={{flexShrink:0,width:NAME_W,borderRight:'1px solid #d8d8d0',background:'#fafaf8'}}>
-          <div style={{height:HEADER_H,borderBottom:'1px solid #d8d8d0',padding:'0 8px',display:'flex',alignItems:'center'}}>
-            <span style={{fontSize:11,fontWeight:600,color:T.accent}}>利用者名</span>
+        {/* 左側固定：名前列 */}
+        <div style={{flexShrink:0,width:NAME_W,borderRight:'2px solid #d8d8d0',background:'#fafaf8',zIndex:2}}>
+          <div style={{height:HEADER_H,borderBottom:'1px solid #d8d8d0',display:'flex',alignItems:'center',padding:'0 8px'}}>
+            <span style={{fontSize:11,fontWeight:600,color:'#2d5a7b'}}>利用者名</span>
           </div>
           {ganttClients.map(client=>{
             const ws=getWorstStatus(client);
-            const worstColor=ws?STATUS_CONFIG[ws].color:T.muted;
+            const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';
             return(
-              <div key={client.id} style={{borderBottom:'1px solid #eceae3'}}>
-                <div style={{padding:'4px 8px 2px',borderLeft:`3px solid ${worstColor}`}}>
-                  <div onClick={()=>onEditClient(client)} style={{fontSize:11,fontWeight:600,color:T.text,cursor:'pointer',lineHeight:1.3}} title="クリックして編集">{client.name}</div>
-                  <div style={{fontSize:9,color:T.muted,marginBottom:2}}>{client.care_manager||''}</div>
+              <div key={client.id} style={{borderBottom:'1px solid #eceae3',borderLeft:`3px solid ${wc}`}}>
+                <div onClick={()=>onEditClient(client)} style={{padding:'5px 6px 2px',cursor:'pointer'}} title="クリックして編集">
+                  <div style={{fontSize:11,fontWeight:600,color:'#1a1a2e',lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{client.name}</div>
+                  <div style={{fontSize:8,color:'#8888a0',marginBottom:1}}>{client.care_manager||''}</div>
                 </div>
-                {DEADLINE_TYPES.map(dt=>(
-                  <div key={dt.key} style={{height:ROW_H,display:'flex',alignItems:'center',padding:'0 8px'}}>
-                    <span style={{fontSize:9,color:T.muted}}>{dt.short}</span>
-                  </div>
-                ))}
-                <div style={{height:CLIENT_GAP}}/>
+                {DEADLINE_TYPES.map(dt=><div key={dt.key} style={{height:BAR_ROW_H,display:'flex',alignItems:'center',padding:'0 6px'}}><span style={{fontSize:9,color:'#8888a0'}}>{dt.short}</span></div>)}
               </div>
             );
           })}
         </div>
-        {/* チャート部分（スクロール） */}
-        <div ref={scrollRef} style={{flex:1,overflowX:'auto',overflowY:'hidden'}}>
-          <div style={{minWidth:chartW,position:'relative'}}>
+        {/* 右側スクロール：チャート */}
+        <div ref={scrollRef} style={{flex:1,overflowX:'auto',overflowY:'hidden',position:'relative'}}>
+          <div style={{minWidth:chartW}}>
             {/* 月ヘッダー */}
-            <div style={{display:'flex',height:HEADER_H,borderBottom:'1px solid #d8d8d0'}}>
+            <div style={{display:'flex',height:HEADER_H,borderBottom:'1px solid #d8d8d0',position:'sticky',top:0,zIndex:1,background:'#fff'}}>
               {months.map((m,i)=>{
-                const isCurrentMonth=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
-                return(
-                  <div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
-                    borderRight:'1px solid #eceae3',fontSize:11,fontWeight:isCurrentMonth?700:400,
-                    color:isCurrentMonth?T.accent:T.muted,background:isCurrentMonth?'#e8f0f5':'transparent'}}>
-                    {m.getMonth()+1}月
-                  </div>
-                );
+                const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
+                return <div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'transparent'}}>{m.getMonth()+1}月</div>;
               })}
             </div>
             {/* クライアント行 */}
             {ganttClients.map(client=>(
               <div key={client.id} style={{borderBottom:'1px solid #eceae3',position:'relative'}}>
-                <div style={{padding:'4px 0 2px',height:16}}/>
-                <div style={{fontSize:9,color:'transparent',marginBottom:2,height:10}}>&nbsp;</div>
+                {/* 名前行と同じ高さのスペーサー */}
+                <div style={{height:28}}/>
+                {/* バー行 */}
                 {DEADLINE_TYPES.map(dt=>{
                   const dateStr=client[dt.key];
+                  if(!dateStr) return <div key={dt.key} style={{height:BAR_ROW_H}}/>;
                   const days=getDaysUntil(dateStr);
                   const status=getStatus(days);
-                  if(!dateStr) return <div key={dt.key} style={{height:ROW_H}}/>;
-                  const endX=dayToX(dateStr);
-                  const barStart=0;
-                  const barWidth=Math.max(2,endX-barStart);
+                  const rawEndX=dayToX(dateStr);
+                  const endX=Math.max(0,Math.min(chartW,rawEndX));
+                  const barStartX=Math.max(0,Math.min(chartW,todayX));
+
                   let barColor=GANTT_BAR_COLORS[dt.key].bar;
                   if(status==='expired')barColor='#c0392b';
                   else if(status==='warning')barColor='#d35400';
-                  else if(status==='caution')barColor='#8b6914';
+                  else if(status==='caution')barColor='#b8860b';
+
                   const d=new Date(dateStr+'T00:00:00');
-                  const label=`${d.getMonth()+1}/${d.getDate()}`;
+                  const dateLabel=`${d.getMonth()+1}/${d.getDate()}`;
+                  const tooltip=`${DEADLINE_TYPES.find(x=>x.key===dt.key).label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
+
+                  // 期限切れ: 今日より前
+                  if(status==='expired'){
+                    return(
+                      <div key={dt.key} style={{height:BAR_ROW_H,position:'relative',display:'flex',alignItems:'center'}}>
+                        <div onClick={()=>onEditClient(client)} title={tooltip}
+                          style={{position:'absolute',left:endX-2,width:6,height:14,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/>
+                        <span style={{position:'absolute',left:Math.max(0,endX+8),fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{dateLabel} 超過</span>
+                      </div>
+                    );
+                  }
+                  // 通常: 今日→期限日
+                  const barW=Math.max(3,endX-barStartX);
                   return(
-                    <div key={dt.key} style={{height:ROW_H,position:'relative',display:'flex',alignItems:'center'}}>
-                      <div onClick={()=>onEditClient(client)}
-                        title={`${DEADLINE_TYPES.find(x=>x.key===dt.key).label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):''})`}
-                        style={{position:'absolute',left:barStart,width:barWidth,height:12,borderRadius:3,
-                          background:barColor,opacity:0.85,cursor:'pointer',transition:'opacity 0.15s'}}
+                    <div key={dt.key} style={{height:BAR_ROW_H,position:'relative',display:'flex',alignItems:'center'}}>
+                      <div onClick={()=>onEditClient(client)} title={tooltip}
+                        style={{position:'absolute',left:barStartX,width:barW,height:14,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer',transition:'opacity 0.15s'}}
                         onMouseEnter={e=>e.currentTarget.style.opacity='1'}
-                        onMouseLeave={e=>e.currentTarget.style.opacity='0.85'}
-                      />
-                      {endX>10&&endX<chartW-5&&(
-                        <span style={{position:'absolute',left:endX+3,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{label}</span>
+                        onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>
+                      {endX>20&&endX<chartW-30&&(
+                        <span style={{position:'absolute',left:endX+4,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{dateLabel}</span>
                       )}
                     </div>
                   );
                 })}
-                <div style={{height:CLIENT_GAP}}/>
                 {/* 月区切り線 */}
-                {months.map((m,i)=>i>0&&(
-                  <div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#eceae3',pointerEvents:'none'}}/>
-                ))}
+                {months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#eceae3',pointerEvents:'none'}}/>)}
               </div>
             ))}
-            {/* 今日線 */}
-            <div style={{position:'absolute',top:0,bottom:0,left:todayX,width:2,background:'#c0392b',opacity:0.6,pointerEvents:'none',zIndex:5}}/>
-            <div style={{position:'absolute',top:2,left:todayX-8,fontSize:8,color:'#c0392b',fontWeight:700,pointerEvents:'none',zIndex:5}}>今日</div>
+            {/* 今日線（全体にかぶせる） */}
+            <div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.5,pointerEvents:'none',zIndex:3}}/>
           </div>
         </div>
       </div>
-      {ganttClients.length===0&&(
-        <div style={{textAlign:'center',padding:30,color:T.muted,fontSize:13}}>期限が設定されている利用者がいません</div>
-      )}
     </div>
   );
 }
@@ -251,23 +217,7 @@ function CalendarPreview({typeKey,userName,dateStr}){const titles=buildCalendarT
 
 function PinScreen({onAuth}){
   const[pin,setPin]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[showPin,setShowPin]=useState(false);
-  const submit=async()=>{
-    if(!pin.trim()){setError('パスワードを入力してください');return;}
-    setLoading(true);setError('');
-    try{
-      const res=await fetch('/api/clients',{headers:{'x-pin':pin}});
-      if(res.ok){
-        const data=await res.json();
-        const role=data.role||'user';
-        localStorage.setItem('kigen-pin',pin);
-        localStorage.setItem('auth_role',role);
-        onAuth(pin,role);
-      }else{
-        setError('パスワードが正しくありません');
-      }
-    }catch{setError('接続エラー');}
-    setLoading(false);
-  };
+  const submit=async()=>{if(!pin.trim()){setError('パスワードを入力してください');return;}setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){const data=await res.json();const role=data.role||'user';localStorage.setItem('kigen-pin',pin);localStorage.setItem('auth_role',role);onAuth(pin,role);}else{setError('パスワードが正しくありません');}}catch{setError('接続エラー');}setLoading(false);};
   return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>プラン期限システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type={showPin?'text':'password'} value={pin} onChange={e=>{setPin(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',padding:'0 40px 0 0'}}/><button type="button" onMouseDown={()=>setShowPin(true)} onMouseUp={()=>setShowPin(false)} onMouseLeave={()=>setShowPin(false)} onTouchStart={()=>setShowPin(true)} onTouchEnd={()=>setShowPin(false)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center'}}><EyeIcon show={showPin}/></button></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading?0.5:1}}>{loading?'認証中...':'ログイン'}</button></div></div>);}
 
 function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
@@ -285,25 +235,11 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
   const[name,setName]=useState('');const[careManager,setCareManager]=useState(initialCM);
   const[ninteiEnd,setNinteiEnd]=useState('');const[longEnd,setLongEnd]=useState('');const[shortEnd,setShortEnd]=useState('');
   const[saving,setSaving]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
-
-  useEffect(()=>{if(managerList.length>0&&!careManager){const s=localStorage.getItem('kigen-reg-cm')||'';const v=managerList.includes(s)?s:managerList[0];setCareManager(v);}},[managerList,careManager]);
+  useEffect(()=>{if(managerList.length>0&&!careManager){const s=localStorage.getItem('kigen-reg-cm')||'';setCareManager(managerList.includes(s)?s:managerList[0]);}},[managerList,careManager]);
   const handleCMChange=(v)=>{setCareManager(v);setError('');setSuccess('');try{localStorage.setItem('kigen-reg-cm',v);}catch{}};
-
-  const handleSubmit=async()=>{
-    if(!name.trim()){setError('利用者名を入力してください');return;}
-    if(!careManager){setError('担当ケアマネジャーを選択してください');return;}
-    setSaving(true);setError('');setSuccess('');
-    try{
-      const res=await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({name:name.trim(),care_manager:careManager,nintei_end:ninteiEnd||null,long_end:longEnd||null,short_end:shortEnd||null})});
-      if(res.ok){const data=await res.json();setSuccess(`${data.client.name} さんを登録しました`);setName('');setNinteiEnd('');setLongEnd('');setShortEnd('');onRegistered(data.client);}
-      else{const data=await res.json();setError(data.error||'登録に失敗しました');}
-    }catch{setError('接続エラー');}
-    setSaving(false);
-  };
-
+  const handleSubmit=async()=>{if(!name.trim()){setError('利用者名を入力してください');return;}if(!careManager){setError('担当ケアマネジャーを選択してください');return;}setSaving(true);setError('');setSuccess('');try{const res=await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({name:name.trim(),care_manager:careManager,nintei_end:ninteiEnd||null,long_end:longEnd||null,short_end:shortEnd||null})});if(res.ok){const data=await res.json();setSuccess(`${data.client.name} さんを登録しました`);setName('');setNinteiEnd('');setLongEnd('');setShortEnd('');onRegistered(data.client);}else{const data=await res.json();setError(data.error||'登録に失敗しました');}}catch{setError('接続エラー');}setSaving(false);};
   const inputStyle={width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text};
   const labelStyle={display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6};
-
   return(
     <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
@@ -335,43 +271,24 @@ export default function KigenKanri(){
   const[editClient,setEditClient]=useState(null);const[managerFilter,setManagerFilter]=useState('all');
   const[calSyncMap,setCalSyncMap]=useState({});const[isAdmin,setIsAdmin]=useState(false);
   const[showGearMenu,setShowGearMenu]=useState(false);const[mode,setMode]=useState('list');
-  const[allManagers,setAllManagers]=useState([]);
-  const[copiedManager,setCopiedManager]=useState(null);
-  const[viewMode,setViewMode]=useState('list');
-  const gearRef=useRef(null);
+  const[allManagers,setAllManagers]=useState([]);const[copiedManager,setCopiedManager]=useState(null);
+  const[viewMode,setViewMode]=useState('list');const gearRef=useRef(null);
 
-  useEffect(()=>{const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);
-    const savedMgr=localStorage.getItem('kigen-manager-filter');if(savedMgr)setManagerFilter(savedMgr);
-    const savedRole=localStorage.getItem('auth_role');setIsAdmin(savedRole==='admin');},[]);
+  useEffect(()=>{const saved=localStorage.getItem('kigen-pin');if(saved)setPin(saved);else setLoading(false);const savedMgr=localStorage.getItem('kigen-manager-filter');if(savedMgr)setManagerFilter(savedMgr);const savedRole=localStorage.getItem('auth_role');setIsAdmin(savedRole==='admin');},[]);
   useEffect(()=>{if(!showGearMenu)return;const h=e=>{if(gearRef.current&&!gearRef.current.contains(e.target))setShowGearMenu(false);};document.addEventListener('mousedown',h);return()=>document.removeEventListener('mousedown',h);},[showGearMenu]);
   const handleManagerFilterChange=(val)=>{setManagerFilter(val);localStorage.setItem('kigen-manager-filter',val);};
-
   const fetchClients=useCallback(async(p)=>{setLoading(true);try{const res=await fetch('/api/clients',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setClients(data.clients||[]);const syncMap={};(data.clients||[]).forEach(c=>{if(c.care_manager)syncMap[c.care_manager]=!!c.calendar_sync;});setCalSyncMap(syncMap);if(data.role)localStorage.setItem('auth_role',data.role);setIsAdmin(data.role==='admin');}else if(res.status===401){localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');setPin(null);}}catch(e){console.error(e);}setLoading(false);},[]);
   useEffect(()=>{if(pin)fetchClients(pin);},[pin,fetchClients]);
-
   const fetchManagers=useCallback(async(p)=>{try{const res=await fetch('/api/care-managers',{headers:{'x-pin':p}});if(res.ok){const data=await res.json();setAllManagers((data.managers||[]).map(m=>m.name));}}catch(e){console.error(e);}},[]);
   useEffect(()=>{if(pin)fetchManagers(pin);},[pin,fetchManagers]);
-
   const handleCalSyncToggle=async(name)=>{const newVal=!calSyncMap[name];setCalSyncMap(prev=>({...prev,[name]:newVal}));if(!newVal)setCopiedManager(null);try{await fetch('/api/care-managers',{method:'PUT',headers:{'Content-Type':'application/json','x-pin':pin},body:JSON.stringify({manager_name:name,calendar_sync:newVal})});}catch(e){console.error(e);}};
-
-  const handleCopyUrl=async(managerName)=>{
-    const url=getCalendarFeedUrl(managerName);
-    try{await navigator.clipboard.writeText(url);setCopiedManager(managerName);setTimeout(()=>setCopiedManager(prev=>prev===managerName?null:prev),2000);}catch{
-      const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);setCopiedManager(managerName);setTimeout(()=>setCopiedManager(prev=>prev===managerName?null:prev),2000);
-    }
-  };
-
+  const handleCopyUrl=async(managerName)=>{const url=getCalendarFeedUrl(managerName);try{await navigator.clipboard.writeText(url);setCopiedManager(managerName);setTimeout(()=>setCopiedManager(prev=>prev===managerName?null:prev),2000);}catch{const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);setCopiedManager(managerName);setTimeout(()=>setCopiedManager(prev=>prev===managerName?null:prev),2000);}};
   const managers=useMemo(()=>{const set=new Set(clients.map(c=>c.care_manager).filter(Boolean));return Array.from(set).sort();},[clients]);
   const filteredClients=useMemo(()=>{let list=clients;if(managerFilter!=='all')list=list.filter(c=>c.care_manager===managerFilter);return list;},[clients,managerFilter]);
   const summary=useMemo(()=>{const counts={expired:0,warning:0,caution:0,safe:0,attention:0,unset:0};filteredClients.forEach(client=>{if(!hasAnyDeadline(client)){counts.unset++;return;}const statuses=getClientStatuses(client);if(statuses.has('expired'))counts.expired++;if(statuses.has('warning'))counts.warning++;if(statuses.has('caution'))counts.caution++;if(statuses.has('safe'))counts.safe++;if(statuses.has('expired')||statuses.has('warning')||statuses.has('caution'))counts.attention++;});return counts;},[filteredClients]);
   const filteredSortedClients=useMemo(()=>{const priority={expired:0,warning:1,caution:2,safe:3};let list=filteredClients.map(c=>({...c,worstStatus:getWorstStatus(c)}));list=list.filter(c=>clientMatchesFilter(c,activeFilter));list.sort((a,b)=>{const ap=a.worstStatus===null?99:(priority[a.worstStatus]??5);const bp=b.worstStatus===null?99:(priority[b.worstStatus]??5);return ap-bp;});return list;},[filteredClients,activeFilter]);
-
   const handleSave=(updatedClient)=>{setClients(prev=>prev.map(c=>c.id===updatedClient.id?{...updatedClient,calendar_sync:c.calendar_sync}:c));setEditClient(null);};
-  const handleLogout=()=>{
-    setShowGearMenu(false);
-    if(!window.confirm('ログアウトしなければ次回以降もログインは不要です。ログアウトしますか？'))return;
-    localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setIsAdmin(false);
-  };
+  const handleLogout=()=>{setShowGearMenu(false);if(!window.confirm('ログアウトしなければ次回以降もログインは不要です。ログアウトしますか？'))return;localStorage.removeItem('kigen-pin');localStorage.removeItem('auth_role');localStorage.removeItem('portal_authed');localStorage.removeItem('auth_pin');setPin(null);setClients([]);setIsAdmin(false);};
   const handleAuth=(p,role)=>{setPin(p);setIsAdmin(role==='admin');};
   const handleRegistered=(newClient)=>{setClients(prev=>[...prev,newClient].sort((a,b)=>(a.name||'').localeCompare(b.name||'')));};
 
@@ -390,9 +307,7 @@ export default function KigenKanri(){
     </div>
   );
 
-  if(mode==='register'){
-    return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers} gearMenu={gearMenu} isAdmin={isAdmin}/>;
-  }
+  if(mode==='register') return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers} gearMenu={gearMenu} isAdmin={isAdmin}/>;
 
   const FILTER_ITEMS=[
     {key:'safe',label:'余裕あり',color:STATUS_CONFIG.safe.color,count:summary.safe},
@@ -426,18 +341,14 @@ export default function KigenKanri(){
                     <span style={{fontSize:14,fontWeight:500,color:T.text}}>{m}</span>
                     <span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span>
                   </label>
-                  {isSynced&&(
-                    <div style={{padding:'0 14px 12px',borderTop:'1px solid #b8ddd0'}}>
-                      <p style={{margin:'8px 0 6px',fontSize:11,color:T.sub,fontWeight:500}}>📋 カレンダー同期URL</p>
-                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                        <input type="text" readOnly value={getCalendarFeedUrl(m)} style={{flex:1,padding:'7px 10px',fontSize:11,border:'1px solid #d8d8d0',borderRadius:5,background:'#fff',color:T.sub,outline:'none',boxSizing:'border-box',fontFamily:'monospace'}}/>
-                        <button onClick={()=>handleCopyUrl(m)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:4,padding:'6px 12px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,cursor:'pointer',background:isCopied?'#27766a':'#fff',color:isCopied?'#fff':T.sub,transition:'all 0.2s'}}>
-                          {isCopied?<><CheckIcon/> コピー済</>:<><CopyIcon/> コピー</>}
-                        </button>
-                      </div>
-                      <p style={{margin:'6px 0 0',fontSize:10,color:T.muted,lineHeight:1.4}}>GoogleカレンダーのURL追加で登録してください</p>
+                  {isSynced&&(<div style={{padding:'0 14px 12px',borderTop:'1px solid #b8ddd0'}}>
+                    <p style={{margin:'8px 0 6px',fontSize:11,color:T.sub,fontWeight:500}}>📋 カレンダー同期URL</p>
+                    <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                      <input type="text" readOnly value={getCalendarFeedUrl(m)} style={{flex:1,padding:'7px 10px',fontSize:11,border:'1px solid #d8d8d0',borderRadius:5,background:'#fff',color:T.sub,outline:'none',boxSizing:'border-box',fontFamily:'monospace'}}/>
+                      <button onClick={()=>handleCopyUrl(m)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:4,padding:'6px 12px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,cursor:'pointer',background:isCopied?'#27766a':'#fff',color:isCopied?'#fff':T.sub,transition:'all 0.2s'}}>{isCopied?<><CheckIcon/> コピー済</>:<><CopyIcon/> コピー</>}</button>
                     </div>
-                  )}
+                    <p style={{margin:'6px 0 0',fontSize:10,color:T.muted,lineHeight:1.4}}>GoogleカレンダーのURL追加で登録してください</p>
+                  </div>)}
                 </div>
               );})}
             </div>
@@ -453,45 +364,28 @@ export default function KigenKanri(){
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div>
-              <h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>
-              <p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p>
-            </div>
+            <div><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p></div>
             {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>
-            {gearMenu}
+            <button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>{gearMenu}
           </div>
         </div>
 
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-          <div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',display:'flex',alignItems:'center',gap:8}}>
-            <span style={T.barStyle}></span>検索
-          </div>
+          <div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',display:'flex',alignItems:'center',gap:8}}><span style={T.barStyle}></span>検索</div>
           <div style={{display:'flex',gap:2,background:'#eceae3',borderRadius:6,padding:2}}>
-            <button onClick={()=>setViewMode('list')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='list'?'#fff':'transparent',color:viewMode==='list'?T.accent:T.muted,boxShadow:viewMode==='list'?'0 1px 2px rgba(0,0,0,.1)':'none'}}>
-              <ListIcon/>一覧
-            </button>
-            <button onClick={()=>setViewMode('gantt')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='gantt'?'#fff':'transparent',color:viewMode==='gantt'?T.accent:T.muted,boxShadow:viewMode==='gantt'?'0 1px 2px rgba(0,0,0,.1)':'none'}}>
-              <GanttIcon/>ガント
-            </button>
+            <button onClick={()=>setViewMode('list')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='list'?'#fff':'transparent',color:viewMode==='list'?T.accent:T.muted,boxShadow:viewMode==='list'?'0 1px 2px rgba(0,0,0,.1)':'none'}}><ListIcon/>一覧</button>
+            <button onClick={()=>setViewMode('gantt')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='gantt'?'#fff':'transparent',color:viewMode==='gantt'?T.accent:T.muted,boxShadow:viewMode==='gantt'?'0 1px 2px rgba(0,0,0,.1)':'none'}}><GanttIcon/>ガント</button>
           </div>
         </div>
         <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
           {viewMode==='list'&&FILTER_ITEMS.map(item=>(
-            <button key={item.key} onClick={()=>setActiveFilter(item.key)} style={{
-              flexShrink:0,padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',
-              background:activeFilter===item.key?item.color:'#fff',
-              color:activeFilter===item.key?'#fff':item.color,
-              border:`1px solid ${activeFilter===item.key?item.color:'#d8d8d0'}`,
-            }}>{item.label} ({item.count})</button>
+            <button key={item.key} onClick={()=>setActiveFilter(item.key)} style={{flexShrink:0,padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',background:activeFilter===item.key?item.color:'#fff',color:activeFilter===item.key?'#fff':item.color,border:`1px solid ${activeFilter===item.key?item.color:'#d8d8d0'}`}}>{item.label} ({item.count})</button>
           ))}
           {managers.length>1&&(
-            <select value={managerFilter} onChange={e=>handleManagerFilterChange(e.target.value)}
-              style={{padding:'6px 12px',fontSize:12,borderRadius:6,border:'1px solid #d8d8d0',background:'#fff',color:T.text,outline:'none',marginLeft:viewMode==='list'?'auto':0}}>
-              <option value="all">全ケアマネ</option>
-              {managers.map(m=><option key={m} value={m}>{m}</option>)}
+            <select value={managerFilter} onChange={e=>handleManagerFilterChange(e.target.value)} style={{padding:'6px 12px',fontSize:12,borderRadius:6,border:'1px solid #d8d8d0',background:'#fff',color:T.text,outline:'none',marginLeft:viewMode==='list'?'auto':0}}>
+              <option value="all">全ケアマネ</option>{managers.map(m=><option key={m} value={m}>{m}</option>)}
             </select>
           )}
         </div>
@@ -503,18 +397,13 @@ export default function KigenKanri(){
             {(summary.expired>0||summary.warning>0)&&(
               <div style={{...T.card,padding:'12px 16px',marginBottom:16,background:'#fdf0ee',border:'1px solid #e8c8c8',display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:22}}>⚠️</span>
-                <div>
-                  <p style={{margin:0,fontSize:13,fontWeight:600,color:'#c0392b'}}>要対応: {summary.expired+summary.warning}名</p>
-                  <p style={{margin:'2px 0 0',fontSize:11,color:'#8b6914'}}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p>
-                </div>
+                <div><p style={{margin:0,fontSize:13,fontWeight:600,color:'#c0392b'}}>要対応: {summary.expired+summary.warning}名</p><p style={{margin:'2px 0 0',fontSize:11,color:'#8b6914'}}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p></div>
               </div>
             )}
-
             <div style={{borderTop:'1px solid #d8d8d0',paddingTop:12,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <span style={{fontSize:14,fontWeight:600,color:T.accent}}>検索結果</span>
               <span style={{fontSize:12,color:T.muted,background:'#eceae3',padding:'2px 10px',borderRadius:10,fontWeight:500}}>{filteredSortedClients.length}名</span>
             </div>
-
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
             {filteredSortedClients.map(client=>{
               const deadlines=DEADLINE_TYPES.map(dt=>({...dt,date:client[dt.key],days:getDaysUntil(client[dt.key]),status:getStatus(getDaysUntil(client[dt.key]))}));
@@ -551,14 +440,11 @@ export default function KigenKanri(){
               );
             })}
             </div>
-            {filteredSortedClients.length===0&&(
-              <div style={{textAlign:'center',padding:40,color:T.muted}}><div style={{fontSize:40,marginBottom:12}}>📋</div><p>該当する利用者はいません</p></div>
-            )}
+            {filteredSortedClients.length===0&&(<div style={{textAlign:'center',padding:40,color:T.muted}}><div style={{fontSize:40,marginBottom:12}}>📋</div><p>該当する利用者はいません</p></div>)}
           </>
         )}
         <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
       </div>
-
       {editClient&&<DeadlineForm client={editClient} pin={pin} onSave={handleSave} onClose={()=>setEditClient(null)} showCalendar={!!calSyncMap[editClient.care_manager]}/>}
     </div>
   );
