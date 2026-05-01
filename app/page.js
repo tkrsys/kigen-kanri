@@ -17,11 +17,7 @@ const CAL_CONFIG = {
   long_end:   { label: '長期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: '担当者会議＋ﾌﾟﾗﾝ交付' },
   short_end:  { label: '短期期限', preAction: 'ｱｾｽﾒﾝﾄ', midAction: 'ﾌﾟﾗﾝ交付' },
 };
-const GANTT_BAR_COLORS = {
-  nintei_end: { bar: '#2d5a7b' },
-  long_end:   { bar: '#5a8a5e' },
-  short_end:  { bar: '#8b6914' },
-};
+const GANTT_BAR_COLORS = { nintei_end:{bar:'#2d5a7b'}, long_end:{bar:'#5a8a5e'}, short_end:{bar:'#8b6914'} };
 
 function getDaysUntil(dateStr) { if (!dateStr) return null; const today = new Date(); today.setHours(0,0,0,0); const n = typeof dateStr==='string'?dateStr.split('T')[0]:dateStr; return Math.floor((new Date(n+'T00:00:00')-today)/(1000*60*60*24)); }
 function getStatus(days) { if(days===null)return null; if(days<0)return'expired'; if(days<=30)return'warning'; if(days<=75)return'caution'; return'safe'; }
@@ -46,146 +42,73 @@ function parseYearMonthToLastDay(input) {
   if(reiwa){ year=parseInt(reiwa[1],10)+2018; month=parseInt(reiwa[2],10); }
   else{ const seireki=s.match(/^(\d{4})[\/\-](\d{1,2})$/); if(!seireki)return null; year=parseInt(seireki[1],10); month=parseInt(seireki[2],10); }
   if(month<1||month>12||year<2000||year>2100)return null;
-  const lastDay=new Date(year,month,0).getDate();
-  return`${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  return`${year}-${String(month).padStart(2,'0')}-${String(new Date(year,month,0).getDate()).padStart(2,'0')}`;
 }
 
 function YearMonthShortcut({onApply}){
   const[val,setVal]=useState('');const[msg,setMsg]=useState(null);
-  const handleApply=()=>{
-    const result=parseYearMonthToLastDay(val);
-    if(result){ onApply(result); const d=new Date(result+'T00:00:00'); setMsg({ok:true,text:`→ ${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} を設定`}); setVal(''); setTimeout(()=>setMsg(null),2000); }
-    else{ setMsg({ok:false,text:'例: 2026/4 or R8/4'}); setTimeout(()=>setMsg(null),2000); }
-  };
-  return(
-    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
-      <input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}} placeholder="年/月 or R8/4 → 末日" style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/>
-      <button type="button" onClick={handleApply} style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>末日設定</button>
-      {msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}
-    </div>
-  );
+  const handleApply=()=>{const result=parseYearMonthToLastDay(val);if(result){onApply(result);const d=new Date(result+'T00:00:00');setMsg({ok:true,text:`→ ${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} を設定`});setVal('');setTimeout(()=>setMsg(null),2000);}else{setMsg({ok:false,text:'例: 2026/4 or R8/4'});setTimeout(()=>setMsg(null),2000);}};
+  return(<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}><input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}} placeholder="年/月 or R8/4 → 末日" style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/><button type="button" onClick={handleApply} style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>末日設定</button>{msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}</div>);
 }
 
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
-  const MONTHS=12;
-  const MON_W=80;
-  const NAME_W=110;
-  const BAR_ROW_H=22;
-  const HEADER_H=30;
-
+  const MONTHS=12;const MON_W=80;const NAME_W=110;const BAR_H=14;const ROW_H=22;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
-  const totalDays=(endDate-startDate)/(86400000);
+  const totalDays=(endDate-startDate)/86400000;
   const chartW=MON_W*MONTHS;
-
-  const dayToX=(dateVal)=>{const d=new Date(typeof dateVal==='string'?dateVal+'T00:00:00':dateVal);const diff=(d-startDate)/86400000;return(diff/totalDays)*chartW;};
+  const dayToX=(dv)=>{const d=new Date(typeof dv==='string'?dv+'T00:00:00':dv);return((d-startDate)/86400000/totalDays)*chartW;};
   const todayX=dayToX(today);
-
-  const ganttClients=useMemo(()=>{
-    const priority={expired:0,warning:1,caution:2,safe:3};
-    return clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{
-      const wa=getWorstStatus(a),wb=getWorstStatus(b);
-      return (wa===null?99:priority[wa]??5)-(wb===null?99:priority[wb]??5);
-    });
-  },[clients]);
-
+  const ganttClients=useMemo(()=>{const p={expired:0,warning:1,caution:2,safe:3};return clients.filter(c=>hasAnyDeadline(c)).sort((a,b)=>{const wa=getWorstStatus(a),wb=getWorstStatus(b);return(wa===null?99:p[wa]??5)-(wb===null?99:p[wb]??5);});},[clients]);
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollLeft=Math.max(0,todayX-120);},[]);
 
-  if(ganttClients.length===0) return <div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
+  if(ganttClients.length===0)return<div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
+
+  const renderBar=(client,dt)=>{
+    const dateStr=client[dt.key];if(!dateStr)return null;
+    const days=getDaysUntil(dateStr);const status=getStatus(days);
+    const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
+    const barStartX=Math.max(0,Math.min(chartW,todayX));
+    let barColor=GANTT_BAR_COLORS[dt.key].bar;
+    if(status==='expired')barColor='#c0392b';else if(status==='warning')barColor='#d35400';else if(status==='caution')barColor='#b8860b';
+    const d=new Date(dateStr+'T00:00:00');const dateLabel=`${d.getMonth()+1}/${d.getDate()}`;
+    const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
+    if(status==='expired'){return(<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(ROW_H-BAR_H)/2,width:6,height:BAR_H,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:3,fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{dateLabel} 超過</span></>);}
+    const barW=Math.max(3,endX-barStartX);
+    return(<><div onClick={()=>onEditClient(client)} title={tip} style={{position:'absolute',left:barStartX,top:(ROW_H-BAR_H)/2,width:barW,height:BAR_H,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>{endX>20&&endX<chartW-30&&<span style={{position:'absolute',left:endX+4,top:3,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{dateLabel}</span>}</>);
+  };
 
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
-      {/* 凡例 */}
       <div style={{display:'flex',padding:'8px 12px',gap:14,flexWrap:'wrap',borderBottom:'1px solid #eceae3'}}>
         {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#4a4a5a'}}><span style={{display:'inline-block',width:14,height:8,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
         <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:10,background:'#c0392b'}}/>今日</span>
       </div>
-      <div style={{display:'flex'}}>
-        {/* 左側固定：名前列 */}
-        <div style={{flexShrink:0,width:NAME_W,borderRight:'2px solid #d8d8d0',background:'#fafaf8',zIndex:2}}>
-          <div style={{height:HEADER_H,borderBottom:'1px solid #d8d8d0',display:'flex',alignItems:'center',padding:'0 8px'}}>
-            <span style={{fontSize:11,fontWeight:600,color:'#2d5a7b'}}>利用者名</span>
-          </div>
-          {ganttClients.map(client=>{
-            const ws=getWorstStatus(client);
-            const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';
-            return(
-              <div key={client.id} style={{borderBottom:'1px solid #eceae3',borderLeft:`3px solid ${wc}`}}>
-                <div onClick={()=>onEditClient(client)} style={{padding:'5px 6px 2px',cursor:'pointer'}} title="クリックして編集">
-                  <div style={{fontSize:11,fontWeight:600,color:'#1a1a2e',lineHeight:1.3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{client.name}</div>
-                  <div style={{fontSize:8,color:'#8888a0',marginBottom:1}}>{client.care_manager||''}</div>
-                </div>
-                {DEADLINE_TYPES.map(dt=><div key={dt.key} style={{height:BAR_ROW_H,display:'flex',alignItems:'center',padding:'0 6px'}}><span style={{fontSize:9,color:'#8888a0'}}>{dt.short}</span></div>)}
-              </div>
-            );
-          })}
-        </div>
-        {/* 右側スクロール：チャート */}
-        <div ref={scrollRef} style={{flex:1,overflowX:'auto',overflowY:'hidden',position:'relative'}}>
-          <div style={{minWidth:chartW}}>
-            {/* 月ヘッダー */}
-            <div style={{display:'flex',height:HEADER_H,borderBottom:'1px solid #d8d8d0',position:'sticky',top:0,zIndex:1,background:'#fff'}}>
-              {months.map((m,i)=>{
-                const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
-                return <div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'transparent'}}>{m.getMonth()+1}月</div>;
-              })}
+      <div style={{display:'flex',alignItems:'stretch'}}>
+        <div style={{flexShrink:0,width:NAME_W,borderRight:'2px solid #d8d8d0',background:'#fafaf8'}}>
+          <div style={{height:30,borderBottom:'1px solid #d8d8d0',display:'flex',alignItems:'center',padding:'0 8px'}}><span style={{fontSize:11,fontWeight:600,color:'#2d5a7b'}}>利用者名</span></div>
+          {ganttClients.map(client=>{const ws=getWorstStatus(client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';return(
+            <div key={client.id} style={{borderBottom:'1px solid #eceae3',borderLeft:`3px solid ${wc}`}}>
+              <div onClick={()=>onEditClient(client)} style={{padding:'4px 6px 2px',cursor:'pointer'}} title="クリックして編集"><div style={{fontSize:11,fontWeight:600,color:'#1a1a2e',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{client.name}</div><div style={{fontSize:8,color:'#8888a0'}}>{client.care_manager||'\u00A0'}</div></div>
+              {DEADLINE_TYPES.map(dt=><div key={dt.key} style={{height:ROW_H,display:'flex',alignItems:'center',padding:'0 6px'}}><span style={{fontSize:9,color:'#8888a0'}}>{dt.short}</span></div>)}
             </div>
-            {/* クライアント行 */}
+          );})}
+        </div>
+        <div ref={scrollRef} style={{flex:1,overflowX:'auto',overflowY:'hidden'}}>
+          <div style={{minWidth:chartW,position:'relative'}}>
+            <div style={{display:'flex',height:30,borderBottom:'1px solid #d8d8d0'}}>
+              {months.map((m,i)=>{const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();return<div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',borderRight:'1px solid #eceae3',fontSize:11,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'transparent'}}>{m.getMonth()+1}月</div>;})}
+            </div>
             {ganttClients.map(client=>(
-              <div key={client.id} style={{borderBottom:'1px solid #eceae3',position:'relative'}}>
-                {/* 名前行と同じ高さのスペーサー */}
-                <div style={{height:28}}/>
-                {/* バー行 */}
-                {DEADLINE_TYPES.map(dt=>{
-                  const dateStr=client[dt.key];
-                  if(!dateStr) return <div key={dt.key} style={{height:BAR_ROW_H}}/>;
-                  const days=getDaysUntil(dateStr);
-                  const status=getStatus(days);
-                  const rawEndX=dayToX(dateStr);
-                  const endX=Math.max(0,Math.min(chartW,rawEndX));
-                  const barStartX=Math.max(0,Math.min(chartW,todayX));
-
-                  let barColor=GANTT_BAR_COLORS[dt.key].bar;
-                  if(status==='expired')barColor='#c0392b';
-                  else if(status==='warning')barColor='#d35400';
-                  else if(status==='caution')barColor='#b8860b';
-
-                  const d=new Date(dateStr+'T00:00:00');
-                  const dateLabel=`${d.getMonth()+1}/${d.getDate()}`;
-                  const tooltip=`${DEADLINE_TYPES.find(x=>x.key===dt.key).label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
-
-                  // 期限切れ: 今日より前
-                  if(status==='expired'){
-                    return(
-                      <div key={dt.key} style={{height:BAR_ROW_H,position:'relative',display:'flex',alignItems:'center'}}>
-                        <div onClick={()=>onEditClient(client)} title={tooltip}
-                          style={{position:'absolute',left:endX-2,width:6,height:14,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/>
-                        <span style={{position:'absolute',left:Math.max(0,endX+8),fontSize:9,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{dateLabel} 超過</span>
-                      </div>
-                    );
-                  }
-                  // 通常: 今日→期限日
-                  const barW=Math.max(3,endX-barStartX);
-                  return(
-                    <div key={dt.key} style={{height:BAR_ROW_H,position:'relative',display:'flex',alignItems:'center'}}>
-                      <div onClick={()=>onEditClient(client)} title={tooltip}
-                        style={{position:'absolute',left:barStartX,width:barW,height:14,borderRadius:3,background:barColor,opacity:0.8,cursor:'pointer',transition:'opacity 0.15s'}}
-                        onMouseEnter={e=>e.currentTarget.style.opacity='1'}
-                        onMouseLeave={e=>e.currentTarget.style.opacity='0.8'}/>
-                      {endX>20&&endX<chartW-30&&(
-                        <span style={{position:'absolute',left:endX+4,fontSize:9,color:barColor,fontWeight:600,whiteSpace:'nowrap'}}>{dateLabel}</span>
-                      )}
-                    </div>
-                  );
-                })}
-                {/* 月区切り線 */}
-                {months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:1,background:'#eceae3',pointerEvents:'none'}}/>)}
+              <div key={client.id} style={{borderBottom:'1px solid #eceae3'}}>
+                <div style={{padding:'4px 0 2px'}}><div style={{fontSize:11,color:'transparent',lineHeight:1.3}}>&nbsp;</div><div style={{fontSize:8,color:'transparent'}}>&nbsp;</div></div>
+                {DEADLINE_TYPES.map(dt=><div key={dt.key} style={{height:ROW_H,position:'relative'}}>{renderBar(client,dt)}</div>)}
               </div>
             ))}
-            {/* 今日線（全体にかぶせる） */}
+            {months.map((_,i)=>i>0&&<div key={i} style={{position:'absolute',top:30,bottom:0,left:MON_W*i,width:1,background:'#eceae3',pointerEvents:'none'}}/>)}
             <div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.5,pointerEvents:'none',zIndex:3}}/>
           </div>
         </div>
@@ -217,7 +140,7 @@ function CalendarPreview({typeKey,userName,dateStr}){const titles=buildCalendarT
 
 function PinScreen({onAuth}){
   const[pin,setPin]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[showPin,setShowPin]=useState(false);
-  const submit=async()=>{if(!pin.trim()){setError('パスワードを入力してください');return;}setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){const data=await res.json();const role=data.role||'user';localStorage.setItem('kigen-pin',pin);localStorage.setItem('auth_role',role);onAuth(pin,role);}else{setError('パスワードが正しくありません');}}catch{setError('接続エラー');}setLoading(false);};
+  const submit=async()=>{if(!pin.trim()){setError('パスワードを入力してください');return;}setLoading(true);setError('');try{const res=await fetch('/api/clients',{headers:{'x-pin':pin}});if(res.ok){const data=await res.json();localStorage.setItem('kigen-pin',pin);localStorage.setItem('auth_role',data.role||'user');onAuth(pin,data.role||'user');}else{setError('パスワードが正しくありません');}}catch{setError('接続エラー');}setLoading(false);};
   return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif"}}><div style={{background:'#fff',padding:40,borderRadius:12,boxShadow:'0 4px 20px rgba(0,0,0,0.1)',textAlign:'center',maxWidth:360,width:'100%'}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><h2 style={{fontSize:18,fontWeight:600,marginBottom:8}}>プラン期限システム</h2><p style={{fontSize:13,color:T.muted,marginBottom:24}}>パスワードを入力してアクセス</p><div style={{position:'relative',marginBottom:16,height:48}}><input type={showPin?'text':'password'} value={pin} onChange={e=>{setPin(e.target.value);setError('');}} onKeyDown={e=>e.key==='Enter'&&submit()} placeholder="パスワード" autoFocus style={{textAlign:'center',fontSize:16,width:'100%',height:48,lineHeight:'48px',boxSizing:'border-box',padding:'0 40px 0 0'}}/><button type="button" onMouseDown={()=>setShowPin(true)} onMouseUp={()=>setShowPin(false)} onMouseLeave={()=>setShowPin(false)} onTouchStart={()=>setShowPin(true)} onTouchEnd={()=>setShowPin(false)} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center'}}><EyeIcon show={showPin}/></button></div>{error&&<p style={{color:'#c0392b',fontSize:13,marginBottom:12}}>{error}</p>}<button onClick={submit} disabled={loading} style={{width:'100%',padding:10,background:'#2d5a7b',color:'#fff',border:'none',borderRadius:6,fontSize:14,fontWeight:500,opacity:loading?0.5:1}}>{loading?'認証中...':'ログイン'}</button></div></div>);}
 
 function DeadlineForm({client,onSave,onClose,pin,showCalendar}){
@@ -241,27 +164,22 @@ function RegisterScreen({pin,onBack,onRegistered,managers:managerList,gearMenu,i
   const inputStyle={width:'100%',padding:10,fontSize:14,border:'1px solid #d8d8d0',borderRadius:6,outline:'none',boxSizing:'border-box',color:T.text};
   const labelStyle={display:'block',fontSize:12,fontWeight:500,color:T.sub,marginBottom:6};
   return(
-    <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
-      <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>{isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}</div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={onBack} style={T.btnBack}>← 戻る</button>{gearMenu}</div>
-        </div>
-        <div style={{fontWeight:700,fontSize:16,color:T.text,marginBottom:16}}>利用者登録</div>
-        {error&&<div style={{padding:'10px 16px',background:'#fdf0ee',border:'1px solid #e8c8c8',borderRadius:6,marginBottom:16,fontSize:13,color:'#c0392b'}}>{error}</div>}
-        {success&&<div style={{padding:'10px 16px',background:'#e8f5f0',border:'1px solid #b8ddd0',borderRadius:6,marginBottom:16,fontSize:13,color:'#27766a'}}>✓ {success}</div>}
-        <div style={T.card}>
-          <div style={{marginBottom:16}}><label style={labelStyle}>利用者名 <span style={{color:'#c0392b'}}>*</span></label><input type="text" value={name} onChange={e=>{setName(e.target.value);setError('');setSuccess('');}} placeholder="例：山田 太郎" style={inputStyle}/></div>
-          <div style={{marginBottom:16}}><label style={labelStyle}>担当ケアマネジャー <span style={{color:'#c0392b'}}>*</span></label><select value={careManager} onChange={e=>handleCMChange(e.target.value)} style={{...inputStyle,appearance:'auto'}}>{managerList.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
-          <div style={{borderTop:'1px solid #eceae3',paddingTop:16,marginTop:8,marginBottom:16}}><div style={T.secTitle}><span style={T.barStyle}></span>期限設定（任意）</div></div>
-          <div style={{marginBottom:16}}><label style={labelStyle}>認定期限</label><YearMonthShortcut onApply={v=>setNinteiEnd(v)}/><input type="date" value={ninteiEnd} onChange={e=>setNinteiEnd(e.target.value)} style={inputStyle}/></div>
-          <div style={{marginBottom:16}}><label style={labelStyle}>長期期限</label><YearMonthShortcut onApply={v=>setLongEnd(v)}/><input type="date" value={longEnd} onChange={e=>setLongEnd(e.target.value)} style={inputStyle}/></div>
-          <div style={{marginBottom:16}}><label style={labelStyle}>短期期限</label><YearMonthShortcut onApply={v=>setShortEnd(v)}/><input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/></div>
-        </div>
-        <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}><button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button></div>
-        <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
+    <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}><div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}><div style={{display:'flex',alignItems:'center',gap:12}}><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1>{isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}</div><div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={onBack} style={T.btnBack}>← 戻る</button>{gearMenu}</div></div>
+      <div style={{fontWeight:700,fontSize:16,color:T.text,marginBottom:16}}>利用者登録</div>
+      {error&&<div style={{padding:'10px 16px',background:'#fdf0ee',border:'1px solid #e8c8c8',borderRadius:6,marginBottom:16,fontSize:13,color:'#c0392b'}}>{error}</div>}
+      {success&&<div style={{padding:'10px 16px',background:'#e8f5f0',border:'1px solid #b8ddd0',borderRadius:6,marginBottom:16,fontSize:13,color:'#27766a'}}>✓ {success}</div>}
+      <div style={T.card}>
+        <div style={{marginBottom:16}}><label style={labelStyle}>利用者名 <span style={{color:'#c0392b'}}>*</span></label><input type="text" value={name} onChange={e=>{setName(e.target.value);setError('');setSuccess('');}} placeholder="例：山田 太郎" style={inputStyle}/></div>
+        <div style={{marginBottom:16}}><label style={labelStyle}>担当ケアマネジャー <span style={{color:'#c0392b'}}>*</span></label><select value={careManager} onChange={e=>handleCMChange(e.target.value)} style={{...inputStyle,appearance:'auto'}}>{managerList.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+        <div style={{borderTop:'1px solid #eceae3',paddingTop:16,marginTop:8,marginBottom:16}}><div style={T.secTitle}><span style={T.barStyle}></span>期限設定（任意）</div></div>
+        <div style={{marginBottom:16}}><label style={labelStyle}>認定期限</label><YearMonthShortcut onApply={v=>setNinteiEnd(v)}/><input type="date" value={ninteiEnd} onChange={e=>setNinteiEnd(e.target.value)} style={inputStyle}/></div>
+        <div style={{marginBottom:16}}><label style={labelStyle}>長期期限</label><YearMonthShortcut onApply={v=>setLongEnd(v)}/><input type="date" value={longEnd} onChange={e=>setLongEnd(e.target.value)} style={inputStyle}/></div>
+        <div style={{marginBottom:16}}><label style={labelStyle}>短期期限</label><YearMonthShortcut onApply={v=>setShortEnd(v)}/><input type="date" value={shortEnd} onChange={e=>setShortEnd(e.target.value)} style={inputStyle}/></div>
       </div>
-    </div>
+      <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}><button onClick={handleSubmit} disabled={saving} style={{...T.btnPrimary,padding:'10px 32px',opacity:saving?0.5:1}}>{saving?'登録中...':'登録'}</button></div>
+      <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
+    </div></div>
   );
 }
 
@@ -295,83 +213,39 @@ export default function KigenKanri(){
   if(!pin)return<PinScreen onAuth={handleAuth}/>;
   if(loading)return<div style={{display:'flex',justifyContent:'center',alignItems:'center',minHeight:'100vh',background:T.bg,fontFamily:"'Noto Sans JP', sans-serif",color:T.muted}}>読み込み中...</div>;
 
-  const gearMenu = (
-    <div ref={gearRef} style={{position:'relative'}}>
-      <button onClick={()=>setShowGearMenu(!showGearMenu)} style={T.btnGear}><GearIcon/></button>
-      {showGearMenu && (
-        <div style={{position:'absolute',right:0,top:'100%',marginTop:4,background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,.12)',minWidth:180,zIndex:50,overflow:'hidden'}}>
-          {isAdmin && <button onClick={()=>{setShowGearMenu(false);setMode('calendarSync');}} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',borderBottom:'1px solid #f0f0f0',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>カレンダー連携設定</button>}
-          <button onClick={handleLogout} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>ログアウト</button>
-        </div>
-      )}
-    </div>
-  );
+  const gearMenu=(<div ref={gearRef} style={{position:'relative'}}><button onClick={()=>setShowGearMenu(!showGearMenu)} style={T.btnGear}><GearIcon/></button>{showGearMenu&&(<div style={{position:'absolute',right:0,top:'100%',marginTop:4,background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,.12)',minWidth:180,zIndex:50,overflow:'hidden'}}>{isAdmin&&<button onClick={()=>{setShowGearMenu(false);setMode('calendarSync');}} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',borderBottom:'1px solid #f0f0f0',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>カレンダー連携設定</button>}<button onClick={handleLogout} style={{display:'block',width:'100%',padding:'10px 16px',background:'none',border:'none',fontSize:13,color:'#4a4a5a',textAlign:'left',cursor:'pointer'}}>ログアウト</button></div>)}</div>);
 
   if(mode==='register') return<RegisterScreen pin={pin} onBack={()=>setMode('list')} onRegistered={handleRegistered} managers={allManagers} gearMenu={gearMenu} isAdmin={isAdmin}/>;
 
-  const FILTER_ITEMS=[
-    {key:'safe',label:'余裕あり',color:STATUS_CONFIG.safe.color,count:summary.safe},
-    {key:'attention',label:'要注意',count:summary.attention,color:'#8b6914'},
-    {key:'warning',label:'30日以内',color:STATUS_CONFIG.warning.color,count:summary.warning},
-    {key:'expired',label:'期限切れ',color:STATUS_CONFIG.expired.color,count:summary.expired},
-    {key:'unset',label:'未登録',color:T.muted,count:summary.unset},
-  ];
+  const FILTER_ITEMS=[{key:'safe',label:'余裕あり',color:STATUS_CONFIG.safe.color,count:summary.safe},{key:'attention',label:'要注意',count:summary.attention,color:'#8b6914'},{key:'warning',label:'30日以内',color:STATUS_CONFIG.warning.color,count:summary.warning},{key:'expired',label:'期限切れ',color:STATUS_CONFIG.expired.color,count:summary.expired},{key:'unset',label:'未登録',color:T.muted,count:summary.unset}];
 
   if(mode==='calendarSync'){
     const calSyncManagers=managerFilter!=='all'?managers.filter(m=>m===managerFilter):managers;
-    return(
-      <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
-        <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-            <div style={{display:'flex',alignItems:'center',gap:12}}><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span></div>
-            <div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={()=>setMode('list')} style={T.btnBack}>← 戻る</button>{gearMenu}</div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
-            <div style={{fontSize:16,fontWeight:700,color:T.text}}>カレンダー連携設定</div>
-            {managerFilter!=='all'&&(<span style={{fontSize:11,color:T.accent,background:'#e8f0f5',padding:'3px 10px',borderRadius:4,fontWeight:500}}>絞込中: {managerFilter}</span>)}
-          </div>
-          <div style={T.card}>
-            <div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div>
-            <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {calSyncManagers.map(m=>{const isSynced=!!calSyncMap[m];const isCopied=copiedManager===m; return(
-                <div key={m} style={{borderRadius:8,background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`,overflow:'hidden'}}>
-                  <label style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',cursor:'pointer'}}>
-                    <input type="checkbox" checked={isSynced} onChange={()=>handleCalSyncToggle(m)} style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}}/>
-                    <span style={{fontSize:14,fontWeight:500,color:T.text}}>{m}</span>
-                    <span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span>
-                  </label>
-                  {isSynced&&(<div style={{padding:'0 14px 12px',borderTop:'1px solid #b8ddd0'}}>
-                    <p style={{margin:'8px 0 6px',fontSize:11,color:T.sub,fontWeight:500}}>📋 カレンダー同期URL</p>
-                    <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                      <input type="text" readOnly value={getCalendarFeedUrl(m)} style={{flex:1,padding:'7px 10px',fontSize:11,border:'1px solid #d8d8d0',borderRadius:5,background:'#fff',color:T.sub,outline:'none',boxSizing:'border-box',fontFamily:'monospace'}}/>
-                      <button onClick={()=>handleCopyUrl(m)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:4,padding:'6px 12px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,cursor:'pointer',background:isCopied?'#27766a':'#fff',color:isCopied?'#fff':T.sub,transition:'all 0.2s'}}>{isCopied?<><CheckIcon/> コピー済</>:<><CopyIcon/> コピー</>}</button>
-                    </div>
-                    <p style={{margin:'6px 0 0',fontSize:10,color:T.muted,lineHeight:1.4}}>GoogleカレンダーのURL追加で登録してください</p>
-                  </div>)}
-                </div>
-              );})}
-            </div>
-          </div>
-          <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
+    return(<div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}><div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}><div style={{display:'flex',alignItems:'center',gap:12}}><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span></div><div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={()=>setMode('list')} style={T.btnBack}>← 戻る</button>{gearMenu}</div></div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}><div style={{fontSize:16,fontWeight:700,color:T.text}}>カレンダー連携設定</div>{managerFilter!=='all'&&<span style={{fontSize:11,color:T.accent,background:'#e8f0f5',padding:'3px 10px',borderRadius:4,fontWeight:500}}>絞込中: {managerFilter}</span>}</div>
+      <div style={T.card}>
+        <div style={T.secTitle}><span style={T.barStyle}></span>Googleカレンダー同期</div>
+        <p style={{margin:'0 0 16px',fontSize:12,color:T.muted,lineHeight:1.5}}>☑にすると、担当利用者の期限予定がGoogleカレンダーに自動同期されます。</p>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {calSyncManagers.map(m=>{const isSynced=!!calSyncMap[m];const isCopied=copiedManager===m;return(
+            <div key={m} style={{borderRadius:8,background:isSynced?'#e8f5f0':'#fafaf8',border:`1px solid ${isSynced?'#27766a':'#d8d8d0'}`,overflow:'hidden'}}>
+              <label style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',cursor:'pointer'}}><input type="checkbox" checked={isSynced} onChange={()=>handleCalSyncToggle(m)} style={{accentColor:'#2d5a7b',width:16,height:16,flexShrink:0}}/><span style={{fontSize:14,fontWeight:500,color:T.text}}>{m}</span><span style={{fontSize:11,color:isSynced?'#27766a':T.muted,marginLeft:'auto'}}>{isSynced?'同期ON':'同期OFF'}</span></label>
+              {isSynced&&<div style={{padding:'0 14px 12px',borderTop:'1px solid #b8ddd0'}}><p style={{margin:'8px 0 6px',fontSize:11,color:T.sub,fontWeight:500}}>📋 カレンダー同期URL</p><div style={{display:'flex',gap:6,alignItems:'center'}}><input type="text" readOnly value={getCalendarFeedUrl(m)} style={{flex:1,padding:'7px 10px',fontSize:11,border:'1px solid #d8d8d0',borderRadius:5,background:'#fff',color:T.sub,outline:'none',boxSizing:'border-box',fontFamily:'monospace'}}/><button onClick={()=>handleCopyUrl(m)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:4,padding:'6px 12px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,cursor:'pointer',background:isCopied?'#27766a':'#fff',color:isCopied?'#fff':T.sub,transition:'all 0.2s'}}>{isCopied?<><CheckIcon/> コピー済</>:<><CopyIcon/> コピー</>}</button></div><p style={{margin:'6px 0 0',fontSize:10,color:T.muted,lineHeight:1.4}}>GoogleカレンダーのURL追加で登録してください</p></div>}
+            </div>);})}
         </div>
       </div>
-    );
+      <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
+    </div></div>);
   }
 
   return(
     <div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
       <div style={{maxWidth:880,margin:'0 auto',padding:'24px 16px 100px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p></div>
-            {isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>{gearMenu}
-          </div>
+          <div style={{display:'flex',alignItems:'center',gap:12}}><div><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p></div>{isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}</div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>{gearMenu}</div>
         </div>
-
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
           <div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',display:'flex',alignItems:'center',gap:8}}><span style={T.barStyle}></span>検索</div>
           <div style={{display:'flex',gap:2,background:'#eceae3',borderRadius:6,padding:2}}>
@@ -380,67 +254,35 @@ export default function KigenKanri(){
           </div>
         </div>
         <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
-          {viewMode==='list'&&FILTER_ITEMS.map(item=>(
-            <button key={item.key} onClick={()=>setActiveFilter(item.key)} style={{flexShrink:0,padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',background:activeFilter===item.key?item.color:'#fff',color:activeFilter===item.key?'#fff':item.color,border:`1px solid ${activeFilter===item.key?item.color:'#d8d8d0'}`}}>{item.label} ({item.count})</button>
-          ))}
-          {managers.length>1&&(
-            <select value={managerFilter} onChange={e=>handleManagerFilterChange(e.target.value)} style={{padding:'6px 12px',fontSize:12,borderRadius:6,border:'1px solid #d8d8d0',background:'#fff',color:T.text,outline:'none',marginLeft:viewMode==='list'?'auto':0}}>
-              <option value="all">全ケアマネ</option>{managers.map(m=><option key={m} value={m}>{m}</option>)}
-            </select>
-          )}
+          {viewMode==='list'&&FILTER_ITEMS.map(item=><button key={item.key} onClick={()=>setActiveFilter(item.key)} style={{flexShrink:0,padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',background:activeFilter===item.key?item.color:'#fff',color:activeFilter===item.key?'#fff':item.color,border:`1px solid ${activeFilter===item.key?item.color:'#d8d8d0'}`}}>{item.label} ({item.count})</button>)}
+          {managers.length>1&&<select value={managerFilter} onChange={e=>handleManagerFilterChange(e.target.value)} style={{padding:'6px 12px',fontSize:12,borderRadius:6,border:'1px solid #d8d8d0',background:'#fff',color:T.text,outline:'none',marginLeft:viewMode==='list'?'auto':0}}><option value="all">全ケアマネ</option>{managers.map(m=><option key={m} value={m}>{m}</option>)}</select>}
         </div>
 
-        {viewMode==='gantt'?(
-          <GanttChart clients={filteredClients} onEditClient={c=>setEditClient(c)}/>
-        ):(
+        {viewMode==='gantt'?<GanttChart clients={filteredClients} onEditClient={c=>setEditClient(c)}/>:(
           <>
-            {(summary.expired>0||summary.warning>0)&&(
-              <div style={{...T.card,padding:'12px 16px',marginBottom:16,background:'#fdf0ee',border:'1px solid #e8c8c8',display:'flex',alignItems:'center',gap:10}}>
-                <span style={{fontSize:22}}>⚠️</span>
-                <div><p style={{margin:0,fontSize:13,fontWeight:600,color:'#c0392b'}}>要対応: {summary.expired+summary.warning}名</p><p style={{margin:'2px 0 0',fontSize:11,color:'#8b6914'}}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p></div>
-              </div>
-            )}
-            <div style={{borderTop:'1px solid #d8d8d0',paddingTop:12,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontSize:14,fontWeight:600,color:T.accent}}>検索結果</span>
-              <span style={{fontSize:12,color:T.muted,background:'#eceae3',padding:'2px 10px',borderRadius:10,fontWeight:500}}>{filteredSortedClients.length}名</span>
-            </div>
+            {(summary.expired>0||summary.warning>0)&&<div style={{...T.card,padding:'12px 16px',marginBottom:16,background:'#fdf0ee',border:'1px solid #e8c8c8',display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:22}}>⚠️</span><div><p style={{margin:0,fontSize:13,fontWeight:600,color:'#c0392b'}}>要対応: {summary.expired+summary.warning}名</p><p style={{margin:'2px 0 0',fontSize:11,color:'#8b6914'}}>期限切れ {summary.expired}名 ・ 30日以内 {summary.warning}名</p></div></div>}
+            <div style={{borderTop:'1px solid #d8d8d0',paddingTop:12,marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontSize:14,fontWeight:600,color:T.accent}}>検索結果</span><span style={{fontSize:12,color:T.muted,background:'#eceae3',padding:'2px 10px',borderRadius:10,fontWeight:500}}>{filteredSortedClients.length}名</span></div>
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
             {filteredSortedClients.map(client=>{
               const deadlines=DEADLINE_TYPES.map(dt=>({...dt,date:client[dt.key],days:getDaysUntil(client[dt.key]),status:getStatus(getDaysUntil(client[dt.key]))}));
               const worstInfo=client.worstStatus?STATUS_CONFIG[client.worstStatus]:{color:T.muted,bg:'#eceae3',label:'未設定'};
-              const isExpanded=expandedClient===client.id;
-              const showCalendar=!!calSyncMap[client.care_manager];
-              const visibleCalKeys=getVisibleCalendarKeys(client);
-              return(
-                <div key={client.id} style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:6,borderLeft:`4px solid ${worstInfo.color}`,overflow:'hidden',boxShadow:'0 1px 2px rgba(0,0,0,.04)'}}>
-                  <div onClick={()=>setExpandedClient(isExpanded?null:client.id)} style={{padding:'8px 16px',cursor:'pointer',display:'flex',alignItems:'center'}}>
-                    <span style={{fontSize:14,fontWeight:600,minWidth:100,flexShrink:0}}>{client.name}</span>
-                    <span style={{fontSize:10,fontWeight:600,color:worstInfo.color,background:worstInfo.bg,padding:'2px 8px',borderRadius:4,flexShrink:0,marginRight:10}}>{worstInfo.label}</span>
-                    {client.care_manager&&<span style={{fontSize:12,color:T.muted,flexShrink:0,marginRight:16}}>担当:{client.care_manager}</span>}
-                    <span style={{display:'flex',gap:12,alignItems:'center',flex:1,justifyContent:'flex-end',marginRight:8}}>
-                      {DEADLINE_TYPES.map(dt=><DeadlineSummaryInline key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short}/>)}
-                    </span>
-                    <span style={{fontSize:13,color:T.muted,flexShrink:0,transform:isExpanded?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
-                  </div>
-                  {isExpanded&&(
-                    <div style={{padding:'0 16px 14px',borderTop:'1px solid #eceae3'}}>
-                      {deadlines.map(dl=>(
-                        <div key={dl.key} style={{padding:'10px 0',borderBottom:'1px solid #f0efe8'}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                            <div><span style={{fontSize:12,fontWeight:600,color:T.sub}}>{dl.label}</span><span style={{fontSize:11,color:T.muted,marginLeft:8}}>{formatDate(dl.date)}</span></div>
-                            <DaysBadge days={dl.days}/>
-                          </div>
-                          {showCalendar&&visibleCalKeys.includes(dl.key)&&<CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date}/>}
-                        </div>
-                      ))}
-                      <button onClick={()=>setEditClient(client)} style={{width:'100%',padding:10,marginTop:10,...T.btnSecondary,fontSize:13}}>期限を編集</button>
-                    </div>
-                  )}
+              const isExpanded=expandedClient===client.id;const showCalendar=!!calSyncMap[client.care_manager];const visibleCalKeys=getVisibleCalendarKeys(client);
+              return(<div key={client.id} style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:6,borderLeft:`4px solid ${worstInfo.color}`,overflow:'hidden',boxShadow:'0 1px 2px rgba(0,0,0,.04)'}}>
+                <div onClick={()=>setExpandedClient(isExpanded?null:client.id)} style={{padding:'8px 16px',cursor:'pointer',display:'flex',alignItems:'center'}}>
+                  <span style={{fontSize:14,fontWeight:600,minWidth:100,flexShrink:0}}>{client.name}</span>
+                  <span style={{fontSize:10,fontWeight:600,color:worstInfo.color,background:worstInfo.bg,padding:'2px 8px',borderRadius:4,flexShrink:0,marginRight:10}}>{worstInfo.label}</span>
+                  {client.care_manager&&<span style={{fontSize:12,color:T.muted,flexShrink:0,marginRight:16}}>担当:{client.care_manager}</span>}
+                  <span style={{display:'flex',gap:12,alignItems:'center',flex:1,justifyContent:'flex-end',marginRight:8}}>{DEADLINE_TYPES.map(dt=><DeadlineSummaryInline key={dt.key} days={getDaysUntil(client[dt.key])} label={dt.short}/>)}</span>
+                  <span style={{fontSize:13,color:T.muted,flexShrink:0,transform:isExpanded?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.2s'}}>▼</span>
                 </div>
-              );
+                {isExpanded&&(<div style={{padding:'0 16px 14px',borderTop:'1px solid #eceae3'}}>
+                  {deadlines.map(dl=>(<div key={dl.key} style={{padding:'10px 0',borderBottom:'1px solid #f0efe8'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><div><span style={{fontSize:12,fontWeight:600,color:T.sub}}>{dl.label}</span><span style={{fontSize:11,color:T.muted,marginLeft:8}}>{formatDate(dl.date)}</span></div><DaysBadge days={dl.days}/></div>{showCalendar&&visibleCalKeys.includes(dl.key)&&<CalendarPreview typeKey={dl.key} userName={client.name} dateStr={dl.date}/>}</div>))}
+                  <button onClick={()=>setEditClient(client)} style={{width:'100%',padding:10,marginTop:10,...T.btnSecondary,fontSize:13}}>期限を編集</button>
+                </div>)}
+              </div>);
             })}
             </div>
-            {filteredSortedClients.length===0&&(<div style={{textAlign:'center',padding:40,color:T.muted}}><div style={{fontSize:40,marginBottom:12}}>📋</div><p>該当する利用者はいません</p></div>)}
+            {filteredSortedClients.length===0&&<div style={{textAlign:'center',padding:40,color:T.muted}}><div style={{fontSize:40,marginBottom:12}}>📋</div><p>該当する利用者はいません</p></div>}
           </>
         )}
         <div style={{fontSize:11,color:T.muted,textAlign:'center',padding:20}}>Copyright &copy; 2026 tkrsys All rights reserved.</div>
