@@ -2,14 +2,18 @@ import { getDb } from '@/lib/db';
 
 function checkPin(request) {
   const pin = request.headers.get('x-pin') || '';
-  const validPin = process.env.APP_PIN || '';
-  if (!validPin) return true;
-  return pin === validPin;
+  const accessPin = process.env.ACCESS_PIN || process.env.APP_PIN || '';
+  const adminPin = process.env.ADMIN_PIN || '';
+  if (!accessPin && !adminPin) return { valid: true, role: 'user' };
+  if (adminPin && pin === adminPin) return { valid: true, role: 'admin' };
+  if (pin === accessPin) return { valid: true, role: 'user' };
+  return { valid: false, role: null };
 }
 
 // PUT: 期限データを登録・更新（UPSERT）
 export async function PUT(request, { params }) {
-  if (!checkPin(request)) {
+  const auth = checkPin(request);
+  if (!auth.valid) {
     return Response.json({ error: '認証エラー' }, { status: 401 });
   }
 
@@ -65,7 +69,8 @@ export async function PUT(request, { params }) {
 
 // DELETE: 期限データを削除
 export async function DELETE(request, { params }) {
-  if (!checkPin(request)) {
+  const auth = checkPin(request);
+  if (!auth.valid) {
     return Response.json({ error: '認証エラー' }, { status: 401 });
   }
 
