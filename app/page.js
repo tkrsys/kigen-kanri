@@ -62,10 +62,10 @@ function YearMonthShortcut({onApply}){
   return(<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}><input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}} placeholder="年/月 or R8/4 → 末日" style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/><button type="button" onClick={handleApply} style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>末日設定</button>{msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}</div>);
 }
 
-/* ★ガントチャート: ヘッダー固定 + 2カラムデータ行 */
+/* ★ガントチャート: 15ヶ月表示 + 全展開/全閉ボタン */
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
-  const MONTHS=24,MON_W=64,ROW_H=28,BAR_H=14,STACK_H=26;
+  const MONTHS=15,MON_W=64,ROW_H=28,BAR_H=14,STACK_H=26;
   const HEADER_H=38,COLLAPSED_H=STACK_H+10,EXPANDED_HEADER_H=32;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
@@ -88,7 +88,13 @@ function GanttChart({clients,onEditClient}){
   const[expandedGantt,setExpandedGantt]=useState({});
   const toggleExpand=id=>setExpandedGantt(p=>({...p,[id]:!p[id]}));
 
-  /* 縦スクロール同期（名前列↔チャート列） + 横スクロール同期（チャート→ヘッダー） */
+  /* ★全展開/全閉 */
+  const allExpanded=useMemo(()=>ganttClients.length>0&&ganttClients.every(c=>!!expandedGantt[c.id]),[ganttClients,expandedGantt]);
+  const toggleAll=()=>{
+    if(allExpanded){setExpandedGantt({});}
+    else{const m={};ganttClients.forEach(c=>{m[c.id]=true;});setExpandedGantt(m);}
+  };
+
   const syncingRef=useRef(false);
   const handleNameScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(chartScrollRef.current&&nameScrollRef.current)chartScrollRef.current.scrollTop=nameScrollRef.current.scrollTop;syncingRef.current=false;};
   const handleChartScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(nameScrollRef.current&&chartScrollRef.current)nameScrollRef.current.scrollTop=chartScrollRef.current.scrollTop;if(headerScrollRef.current&&chartScrollRef.current)headerScrollRef.current.scrollLeft=chartScrollRef.current.scrollLeft;syncingRef.current=false;};
@@ -132,13 +138,13 @@ function GanttChart({clients,onEditClient}){
 
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
-      {/* 凡例 */}
-      <div style={{display:'flex',padding:'6px 10px',gap:12,flexWrap:'wrap',borderBottom:'1px solid #eceae3'}}>
+      {/* 凡例 + 全展開/全閉ボタン */}
+      <div style={{display:'flex',padding:'6px 10px',gap:12,flexWrap:'wrap',alignItems:'center',borderBottom:'1px solid #eceae3'}}>
         {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:3,fontSize:12,color:'#4a4a5a'}}><span style={{display:'inline-block',width:12,height:7,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
         <span style={{display:'flex',alignItems:'center',gap:3,fontSize:12,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:9,background:'#c0392b'}}/>今日</span>
-        <span style={{fontSize:11,color:'#8888a0',marginLeft:'auto'}}>クリックで展開</span>
+        <button onClick={toggleAll} style={{marginLeft:'auto',padding:'3px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:4,background:allExpanded?'#e8f0f5':'#fff',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>{allExpanded?'全閉':'全展開'}</button>
       </div>
-      {/* ★ヘッダー行: スクロール外に固定（利用者名 + 月名） */}
+      {/* ヘッダー行: スクロール外に固定 */}
       <div style={{display:'flex',borderBottom:'1px solid #d8d8d0'}}>
         <div style={{flexShrink:0,height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderRight:'2px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap'}}>利用者名</div>
         <div ref={headerScrollRef} style={{flex:1,overflowX:'hidden',overflowY:'hidden'}}>
@@ -154,9 +160,8 @@ function GanttChart({clients,onEditClient}){
           </div>
         </div>
       </div>
-      {/* ★データ行: 2カラム（名前列固定 + チャート横スクロール）、縦スクロールのみ */}
+      {/* データ行 */}
       <div style={{display:'flex',maxHeight:'65vh'}}>
-        {/* 左: 名前列 */}
         <div ref={nameScrollRef} onScroll={handleNameScroll} style={{flexShrink:0,overflowY:'auto',overflowX:'hidden',borderRight:'2px solid #d8d8d0',scrollbarWidth:'none',msOverflowStyle:'none'}}>
           <style>{`.gantt-name-col::-webkit-scrollbar{display:none}`}</style>
           <div className="gantt-name-col">
@@ -194,7 +199,6 @@ function GanttChart({clients,onEditClient}){
             })}
           </div>
         </div>
-        {/* 右: チャート部分 */}
         <div ref={chartScrollRef} onScroll={handleChartScroll} style={{flex:1,overflow:'auto'}}>
           <div style={{width:chartW,minWidth:chartW}}>
             {ganttClients.map((client,ci)=>{
