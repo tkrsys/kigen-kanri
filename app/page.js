@@ -65,8 +65,8 @@ function YearMonthShortcut({onApply}){
 /* ★ガントチャート: 2カラム構成（名前列固定 + チャート横スクロール） */
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
-  const MONTHS=24,MON_W=64,ROW_H=22,BAR_H=12,STACK_H=18;
-  const HEADER_H=38,COLLAPSED_H=STACK_H+6,EXPANDED_HEADER_H=24;
+  const MONTHS=24,MON_W=64,ROW_H=28,BAR_H=14,STACK_H=26;
+  const HEADER_H=38,COLLAPSED_H=STACK_H+10,EXPANDED_HEADER_H=32;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
@@ -131,7 +131,6 @@ function GanttChart({clients,onEditClient}){
   const renderGridLines=()=>months.map((_,i)=>{if(i===0)return null;const m=months[i];const isJan=m.getMonth()===0;return<div key={'g'+i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:isJan?2:1,background:isJan?'#c8c8c0':'#f0efe8',pointerEvents:'none'}}/>;});
   const renderTodayLine=()=><div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/>;
 
-  /* 各クライアントの行高さを計算 */
   const getClientRowHeights=(client)=>{
     const isExp=!!expandedGantt[client.id];
     if(!isExp) return [COLLAPSED_H];
@@ -209,7 +208,7 @@ function GanttChart({clients,onEditClient}){
               const rows=[];
               if(!isExp){
                 rows.push(
-                  <div key={`c-${client.id}`} onClick={()=>toggleExpand(client.id)} style={{height:COLLAPSED_H,position:'relative',cursor:'pointer',borderTop:ci>0?'1px solid #d8d8d0':'none',paddingTop:3,boxSizing:'border-box'}}>
+                  <div key={`c-${client.id}`} onClick={()=>toggleExpand(client.id)} style={{height:COLLAPSED_H,position:'relative',cursor:'pointer',borderTop:ci>0?'1px solid #d8d8d0':'none',paddingTop:5,boxSizing:'border-box'}}>
                     <div style={{position:'relative',height:STACK_H}}>
                       {renderStackedBars(client)}
                     </div>
