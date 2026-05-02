@@ -87,18 +87,17 @@ function GanttChart({clients,onEditClient}){
 
   if(!ganttClients.length)return<div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
 
+  /* ★日付ラベル削除: バー末尾の日付は非表示（期限切れの超過マーカーのみ残す） */
   const renderBarContent=(client,dt,rowH,barH)=>{
     const dateStr=client[dt.key];if(!dateStr)return null;
     const days=getDaysUntil(dateStr);const status=getStatus(days);
     const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
     const barStartX=Math.max(0,Math.min(chartW,todayX));
     const barColor=GANTT_BAR_COLORS[dt.key].bar;
-    const lblColor=status==='expired'?'#c0392b':GANTT_BAR_COLORS[dt.key].lbl;
-    const d=new Date(nd(dateStr)+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
     const tip=`${dt.label}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
-    if(status==='expired'){return<><div onClick={e=>{e.stopPropagation();onEditClient(client);}} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(rowH-barH)/2,width:6,height:barH,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/><span style={{position:'absolute',left:Math.max(0,endX+8),top:(rowH-10)/2,fontSize:8,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap'}}>{lbl} 超過</span></>;}
+    if(status==='expired'){return<div onClick={e=>{e.stopPropagation();onEditClient(client);}} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:(rowH-barH)/2,width:6,height:barH,borderRadius:2,background:'#c0392b',cursor:'pointer',zIndex:1}}/>;}
     const bw=Math.max(3,endX-barStartX);
-    return<><div onClick={e=>{e.stopPropagation();onEditClient(client);}} title={tip} style={{position:'absolute',left:barStartX,top:(rowH-barH)/2,width:bw,height:barH,borderRadius:3,background:barColor,opacity:0.9,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.9'}/>{endX>16&&endX<chartW-24&&<span style={{position:'absolute',left:endX+3,top:(rowH-10)/2,fontSize:8,color:lblColor,fontWeight:600,whiteSpace:'nowrap'}}>{lbl}</span>}</>;
+    return<div onClick={e=>{e.stopPropagation();onEditClient(client);}} title={tip} style={{position:'absolute',left:barStartX,top:(rowH-barH)/2,width:bw,height:barH,borderRadius:3,background:barColor,opacity:0.9,cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.9'}/>;
   };
 
   const renderStackedBars=(client)=>{
@@ -109,19 +108,13 @@ function GanttChart({clients,onEditClient}){
       const endX=Math.max(0,Math.min(chartW,dayToX(dateStr)));
       const barStartX=Math.max(0,Math.min(chartW,todayX));
       const barColor=GANTT_BAR_COLORS[dt.key].bar;
-      const lblColor=status==='expired'?'#c0392b':GANTT_BAR_COLORS[dt.key].lbl;
       const barH=h-li*2;const topOff=(h-barH)/2;
-      const d=new Date(nd(dateStr)+'T00:00:00');const lbl=`${d.getMonth()+1}/${d.getDate()}`;
       const tip=`${dt.short}: ${formatDate(dateStr)} (${days!==null?(days<0?Math.abs(days)+'日超過':'あと'+days+'日'):'未設定'})`;
       if(status==='expired'){
         layers.push(<div key={dt.key+'m'} title={tip} style={{position:'absolute',left:Math.max(0,endX-2),top:topOff,width:6,height:barH,borderRadius:2,background:'#c0392b',zIndex:10+li}}/>);
-        layers.push(<span key={dt.key+'l'} style={{position:'absolute',left:Math.max(0,endX+8),top:topOff,fontSize:7,color:'#c0392b',fontWeight:600,whiteSpace:'nowrap',zIndex:10+li}}>{lbl}</span>);
       } else {
         const bw=Math.max(3,endX-barStartX);
         layers.push(<div key={dt.key+'b'} title={tip} style={{position:'absolute',left:barStartX,top:topOff,width:bw,height:barH,borderRadius:3,background:barColor,opacity:0.9,zIndex:10+li}}/>);
-        if(endX>16&&endX<chartW-24){
-          layers.push(<span key={dt.key+'l'} style={{position:'absolute',left:endX+3,top:topOff,fontSize:7,color:lblColor,fontWeight:600,whiteSpace:'nowrap',zIndex:10+li}}>{lbl}</span>);
-        }
       }
     });
     return layers;
@@ -129,12 +122,6 @@ function GanttChart({clients,onEditClient}){
 
   const renderGridLines=()=>months.map((_,i)=>{if(i===0)return null;const m=months[i];const isJan=m.getMonth()===0;return<div key={'g'+i} style={{position:'absolute',top:0,bottom:0,left:MON_W*i,width:isJan?2:1,background:isJan?'#c8c8c0':'#f0efe8',pointerEvents:'none'}}/>;});
   const renderTodayLine=()=><div style={{position:'absolute',top:0,bottom:0,left:Math.max(0,todayX),width:2,background:'#c0392b',opacity:0.4,pointerEvents:'none'}}/>;
-
-  const getClientRowHeights=(client)=>{
-    const isExp=!!expandedGantt[client.id];
-    if(!isExp) return [COLLAPSED_H];
-    return [EXPANDED_HEADER_H, ...DEADLINE_TYPES.map(()=>ROW_H)];
-  };
 
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
@@ -144,10 +131,12 @@ function GanttChart({clients,onEditClient}){
         <span style={{fontSize:11,color:'#8888a0',marginLeft:'auto'}}>クリックで展開</span>
       </div>
       <div style={{display:'flex',maxHeight:'70vh'}}>
+        {/* 左: 名前列（固定・縦スクロールのみ） */}
         <div ref={nameScrollRef} onScroll={handleNameScroll} style={{flexShrink:0,overflowY:'auto',overflowX:'hidden',borderRight:'2px solid #d8d8d0',scrollbarWidth:'none',msOverflowStyle:'none'}}>
           <style>{`.gantt-name-col::-webkit-scrollbar{display:none}`}</style>
           <div className="gantt-name-col">
-            <div style={{height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderBottom:'1px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap'}}>利用者名</div>
+            {/* ★利用者名ヘッダー: sticky固定 */}
+            <div style={{height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderBottom:'1px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:2}}>利用者名</div>
             {ganttClients.map((client,ci)=>{
               const isExp=!!expandedGantt[client.id];
               const ws=getWorstStatus(client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';
@@ -182,6 +171,7 @@ function GanttChart({clients,onEditClient}){
             })}
           </div>
         </div>
+        {/* 右: チャート部分（横＋縦スクロール） */}
         <div ref={chartScrollRef} onScroll={handleChartScroll} style={{flex:1,overflow:'auto'}}>
           <div style={{width:chartW,minWidth:chartW}}>
             <div style={{display:'flex',height:HEADER_H,borderBottom:'1px solid #d8d8d0',position:'sticky',top:0,zIndex:2,background:'#fff'}}>
@@ -343,7 +333,7 @@ export default function KigenKanri(){
   }
 
   return(<div style={{fontFamily:"'Noto Sans JP', sans-serif",background:T.bg,minHeight:'100vh',color:T.text}}>
-    <div style={{maxWidth:viewMode==='gantt'?1320:880,margin:'0 auto',padding:'24px 16px 100px'}}>
+    <div style={{maxWidth:viewMode==='gantt'?1100:880,margin:'0 auto',padding:'24px 16px 100px'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,paddingBottom:16,borderBottom:'2px solid #2d5a7b'}}><div style={{display:'flex',alignItems:'center',gap:12}}><div><h1 style={{margin:0,fontSize:20,fontWeight:600}}>プラン期限システム</h1><p style={{margin:'4px 0 0',fontSize:12,color:T.muted}}>{new Date().getFullYear()}年{new Date().getMonth()+1}月{new Date().getDate()}日 現在・{clients.length}名</p></div>{isAdmin&&<span style={{fontSize:11,fontWeight:600,color:'#fff',background:'#c0392b',padding:'2px 8px',borderRadius:4}}>管理者</span>}</div><div style={{display:'flex',alignItems:'center',gap:10}}><button onClick={()=>setMode('register')} style={T.btnAdd}>＋ 利用者</button>{gearMenu}</div></div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}><div style={{fontSize:14,fontWeight:600,color:'#2d5a7b',display:'flex',alignItems:'center',gap:8}}><span style={T.barStyle}></span>検索</div><div style={{display:'flex',gap:2,background:'#eceae3',borderRadius:6,padding:2}}><button onClick={()=>setViewMode('list')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='list'?'#fff':'transparent',color:viewMode==='list'?T.accent:T.muted,boxShadow:viewMode==='list'?'0 1px 2px rgba(0,0,0,.1)':'none'}}><ListIcon/>一覧</button><button onClick={()=>setViewMode('gantt')} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',fontSize:11,fontWeight:500,border:'none',borderRadius:4,cursor:'pointer',background:viewMode==='gantt'?'#fff':'transparent',color:viewMode==='gantt'?T.accent:T.muted,boxShadow:viewMode==='gantt'?'0 1px 2px rgba(0,0,0,.1)':'none'}}><GanttIcon/>ガント</button></div></div>
       <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
