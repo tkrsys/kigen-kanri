@@ -62,11 +62,34 @@ function YearMonthShortcut({onApply}){
   return(<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}><input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}} placeholder="年/月 or R8/4 → 末日" style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/><button type="button" onClick={handleApply} style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>末日設定</button>{msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}</div>);
 }
 
-/* ★ガントチャート: 15ヶ月表示 + 全展開/全閉ボタン */
+/* ★月別サマリー計算関数 */
+function getMonthlyDeadlineSummary(clients, months) {
+  // months: array of Date (1st of each month)
+  return months.map(m => {
+    const y = m.getFullYear(), mo = m.getMonth(); // 0-indexed month
+    const counts = { short_end: 0, long_end: 0, nintei_end: 0 };
+    clients.forEach(c => {
+      DEADLINE_TYPES.forEach(dt => {
+        const dateStr = c[dt.key];
+        if (!dateStr) return;
+        const n = nd(dateStr);
+        const d = new Date(n + 'T00:00:00');
+        if (d.getFullYear() === y && d.getMonth() === mo) {
+          counts[dt.key]++;
+        }
+      });
+    });
+    return counts;
+  });
+}
+
+/* ★ガントチャート: 15ヶ月表示 + 全展開/全閉ボタン + サマリー行 */
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
   const MONTHS=15,MON_W=64,ROW_H=28,BAR_H=14,STACK_H=26;
+  const NAME_W=120;
   const HEADER_H=38,COLLAPSED_H=STACK_H+10,EXPANDED_HEADER_H=32;
+  const SUMMARY_H=32;
   const startDate=useMemo(()=>new Date(today.getFullYear(),today.getMonth(),1),[]);
   const months=useMemo(()=>{const a=[];for(let i=0;i<MONTHS;i++)a.push(new Date(startDate.getFullYear(),startDate.getMonth()+i,1));return a;},[startDate]);
   const endDate=useMemo(()=>new Date(startDate.getFullYear(),startDate.getMonth()+MONTHS,0),[startDate]);
@@ -78,11 +101,13 @@ function GanttChart({clients,onEditClient}){
   const chartScrollRef=useRef(null);
   const nameScrollRef=useRef(null);
   const headerScrollRef=useRef(null);
+  const summaryScrollRef=useRef(null);
   useEffect(()=>{
     if(chartScrollRef.current){
       const left=Math.max(0,todayX-60);
       chartScrollRef.current.scrollLeft=left;
       if(headerScrollRef.current)headerScrollRef.current.scrollLeft=left;
+      if(summaryScrollRef.current)summaryScrollRef.current.scrollLeft=left;
     }
   },[]);
   const[expandedGantt,setExpandedGantt]=useState({});
@@ -95,9 +120,12 @@ function GanttChart({clients,onEditClient}){
     else{const m={};ganttClients.forEach(c=>{m[c.id]=true;});setExpandedGantt(m);}
   };
 
+  /* ★月別サマリー */
+  const monthlySummary = useMemo(() => getMonthlyDeadlineSummary(ganttClients, months), [ganttClients, months]);
+
   const syncingRef=useRef(false);
   const handleNameScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(chartScrollRef.current&&nameScrollRef.current)chartScrollRef.current.scrollTop=nameScrollRef.current.scrollTop;syncingRef.current=false;};
-  const handleChartScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(nameScrollRef.current&&chartScrollRef.current)nameScrollRef.current.scrollTop=chartScrollRef.current.scrollTop;if(headerScrollRef.current&&chartScrollRef.current)headerScrollRef.current.scrollLeft=chartScrollRef.current.scrollLeft;syncingRef.current=false;};
+  const handleChartScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(nameScrollRef.current&&chartScrollRef.current)nameScrollRef.current.scrollTop=chartScrollRef.current.scrollTop;if(headerScrollRef.current&&chartScrollRef.current)headerScrollRef.current.scrollLeft=chartScrollRef.current.scrollLeft;if(summaryScrollRef.current&&chartScrollRef.current)summaryScrollRef.current.scrollLeft=chartScrollRef.current.scrollLeft;syncingRef.current=false;};
 
   if(!ganttClients.length)return<div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
 
@@ -146,7 +174,7 @@ function GanttChart({clients,onEditClient}){
       </div>
       {/* ヘッダー行: スクロール外に固定 */}
       <div style={{display:'flex',borderBottom:'1px solid #d8d8d0'}}>
-        <div style={{flexShrink:0,height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderRight:'2px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap'}}>利用者名</div>
+        <div style={{width:NAME_W,minWidth:NAME_W,flexShrink:0,height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderRight:'2px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap'}}>利用者名</div>
         <div ref={headerScrollRef} style={{flex:1,overflowX:'hidden',overflowY:'hidden'}}>
           <div style={{display:'flex',height:HEADER_H,width:chartW,minWidth:chartW}}>
             {months.map((m,i)=>{
@@ -160,9 +188,30 @@ function GanttChart({clients,onEditClient}){
           </div>
         </div>
       </div>
+      {/* ★月別サマリー行 */}
+      <div style={{display:'flex',borderBottom:'2px solid #d8d8d0',background:'#f8f7f2'}}>
+        <div style={{width:NAME_W,minWidth:NAME_W,flexShrink:0,height:SUMMARY_H,display:'flex',alignItems:'center',padding:'0 8px',fontSize:10,fontWeight:600,color:'#8888a0',background:'#f8f7f2',borderRight:'2px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap'}}>件数</div>
+        <div ref={summaryScrollRef} style={{flex:1,overflowX:'hidden',overflowY:'hidden'}}>
+          <div style={{display:'flex',height:SUMMARY_H,width:chartW,minWidth:chartW}}>
+            {months.map((m,i)=>{
+              const s = monthlySummary[i];
+              const hasAny = s.short_end > 0 || s.long_end > 0 || s.nintei_end > 0;
+              const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
+              const isJan=m.getMonth()===0;const isFirst=i===0;
+              return<div key={i} style={{width:MON_W,flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontSize:9,color:'#4a4a5a',background:cur?'#e8f0f5':'transparent',borderRight:'1px solid #eceae3',borderLeft:isJan&&!isFirst?'2px solid #c8c8c0':'none',boxSizing:'border-box',gap:0,lineHeight:1.2}}>
+                {hasAny ? <>
+                  {s.short_end>0&&<span style={{color:GANTT_BAR_COLORS.short_end.lbl,fontWeight:600}}>短{s.short_end}</span>}
+                  {s.long_end>0&&<span style={{color:GANTT_BAR_COLORS.long_end.lbl,fontWeight:600}}>長{s.long_end}</span>}
+                  {s.nintei_end>0&&<span style={{color:GANTT_BAR_COLORS.nintei_end.lbl,fontWeight:600}}>認{s.nintei_end}</span>}
+                </> : <span style={{color:'#ccc'}}>-</span>}
+              </div>;
+            })}
+          </div>
+        </div>
+      </div>
       {/* データ行 */}
       <div style={{display:'flex',maxHeight:'65vh'}}>
-        <div ref={nameScrollRef} onScroll={handleNameScroll} style={{flexShrink:0,overflowY:'auto',overflowX:'hidden',borderRight:'2px solid #d8d8d0',scrollbarWidth:'none',msOverflowStyle:'none'}}>
+        <div ref={nameScrollRef} onScroll={handleNameScroll} style={{width:NAME_W,minWidth:NAME_W,flexShrink:0,overflowY:'auto',overflowX:'hidden',borderRight:'2px solid #d8d8d0',scrollbarWidth:'none',msOverflowStyle:'none'}}>
           <style>{`.gantt-name-col::-webkit-scrollbar{display:none}`}</style>
           <div className="gantt-name-col">
             {ganttClients.map((client,ci)=>{
@@ -173,8 +222,8 @@ function GanttChart({clients,onEditClient}){
                   <div key={client.id} onClick={()=>toggleExpand(client.id)} style={{height:COLLAPSED_H,display:'flex',alignItems:'center',gap:4,padding:'0 6px',borderLeft:`3px solid ${wc}`,borderTop:ci>0?'1px solid #d8d8d0':'none',cursor:'pointer',background:'#fafaf8',boxSizing:'border-box'}}>
                     <span style={{fontSize:8,color:'#8888a0',flexShrink:0}}>▶</span>
                     <div style={{minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap'}}>{client.name}</div>
-                      <div style={{fontSize:9,color:'#8888a0',whiteSpace:'nowrap'}}>{client.care_manager||''}</div>
+                      <div style={{fontSize:12,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-40}}>{client.name}</div>
+                      <div style={{fontSize:9,color:'#8888a0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-40}}>{client.care_manager||''}</div>
                     </div>
                   </div>
                 );
@@ -184,8 +233,8 @@ function GanttChart({clients,onEditClient}){
                     <div onClick={()=>toggleExpand(client.id)} style={{height:EXPANDED_HEADER_H,display:'flex',alignItems:'center',gap:4,padding:'0 6px',borderLeft:`3px solid ${wc}`,borderTop:ci>0?'1px solid #d8d8d0':'none',cursor:'pointer',background:'#fafaf8',boxSizing:'border-box'}}>
                       <span style={{fontSize:8,color:'#8888a0',flexShrink:0,transform:'rotate(90deg)'}}>▶</span>
                       <div style={{minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap'}}>{client.name}</div>
-                        <div style={{fontSize:9,color:'#8888a0',whiteSpace:'nowrap'}}>{client.care_manager||''}</div>
+                        <div style={{fontSize:12,fontWeight:600,color:'#1a1a2e',lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-40}}>{client.name}</div>
+                        <div style={{fontSize:9,color:'#8888a0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:NAME_W-40}}>{client.care_manager||''}</div>
                       </div>
                     </div>
                     {DEADLINE_TYPES.map((dt,di)=>(
