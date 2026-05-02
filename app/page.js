@@ -62,7 +62,7 @@ function YearMonthShortcut({onApply}){
   return(<div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}><input type="text" value={val} onChange={e=>{setVal(e.target.value);setMsg(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();handleApply();}}} placeholder="年/月 or R8/4 → 末日" style={{width:140,padding:'5px 8px',fontSize:12,border:'1px solid #d8d8d0',borderRadius:5,outline:'none',color:'#4a4a5a',boxSizing:'border-box'}}/><button type="button" onClick={handleApply} style={{padding:'4px 10px',fontSize:11,fontWeight:500,border:'1px solid #d8d8d0',borderRadius:5,background:'#f5f3ee',color:'#2d5a7b',cursor:'pointer',whiteSpace:'nowrap'}}>末日設定</button>{msg&&<span style={{fontSize:10,color:msg.ok?'#27766a':'#c0392b',fontWeight:500}}>{msg.text}</span>}</div>);
 }
 
-/* ★ガントチャート: 2カラム構成（名前列固定 + チャート横スクロール） */
+/* ★ガントチャート: ヘッダー固定 + 2カラムデータ行 */
 function GanttChart({clients,onEditClient}){
   const today=new Date();today.setHours(0,0,0,0);
   const MONTHS=24,MON_W=64,ROW_H=28,BAR_H=14,STACK_H=26;
@@ -77,17 +77,24 @@ function GanttChart({clients,onEditClient}){
   const ganttClients=useMemo(()=>clients.filter(c=>hasAnyDeadline(c)).sort(ganttSortCompare),[clients]);
   const chartScrollRef=useRef(null);
   const nameScrollRef=useRef(null);
-  useEffect(()=>{if(chartScrollRef.current)chartScrollRef.current.scrollLeft=Math.max(0,todayX-60);},[]);
+  const headerScrollRef=useRef(null);
+  useEffect(()=>{
+    if(chartScrollRef.current){
+      const left=Math.max(0,todayX-60);
+      chartScrollRef.current.scrollLeft=left;
+      if(headerScrollRef.current)headerScrollRef.current.scrollLeft=left;
+    }
+  },[]);
   const[expandedGantt,setExpandedGantt]=useState({});
   const toggleExpand=id=>setExpandedGantt(p=>({...p,[id]:!p[id]}));
 
+  /* 縦スクロール同期（名前列↔チャート列） + 横スクロール同期（チャート→ヘッダー） */
   const syncingRef=useRef(false);
   const handleNameScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(chartScrollRef.current&&nameScrollRef.current)chartScrollRef.current.scrollTop=nameScrollRef.current.scrollTop;syncingRef.current=false;};
-  const handleChartScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(nameScrollRef.current&&chartScrollRef.current)nameScrollRef.current.scrollTop=chartScrollRef.current.scrollTop;syncingRef.current=false;};
+  const handleChartScroll=()=>{if(syncingRef.current)return;syncingRef.current=true;if(nameScrollRef.current&&chartScrollRef.current)nameScrollRef.current.scrollTop=chartScrollRef.current.scrollTop;if(headerScrollRef.current&&chartScrollRef.current)headerScrollRef.current.scrollLeft=chartScrollRef.current.scrollLeft;syncingRef.current=false;};
 
   if(!ganttClients.length)return<div style={{textAlign:'center',padding:40,color:'#8888a0',background:'#fff',border:'1px solid #d8d8d0',borderRadius:8}}>期限が設定されている利用者がいません</div>;
 
-  /* ★日付ラベル削除: バー末尾の日付は非表示（期限切れの超過マーカーのみ残す） */
   const renderBarContent=(client,dt,rowH,barH)=>{
     const dateStr=client[dt.key];if(!dateStr)return null;
     const days=getDaysUntil(dateStr);const status=getStatus(days);
@@ -125,18 +132,34 @@ function GanttChart({clients,onEditClient}){
 
   return(
     <div style={{background:'#fff',border:'1px solid #d8d8d0',borderRadius:8,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
+      {/* 凡例 */}
       <div style={{display:'flex',padding:'6px 10px',gap:12,flexWrap:'wrap',borderBottom:'1px solid #eceae3'}}>
         {DEADLINE_TYPES.map(dt=><span key={dt.key} style={{display:'flex',alignItems:'center',gap:3,fontSize:12,color:'#4a4a5a'}}><span style={{display:'inline-block',width:12,height:7,borderRadius:2,background:GANTT_BAR_COLORS[dt.key].bar}}/>{dt.short}</span>)}
         <span style={{display:'flex',alignItems:'center',gap:3,fontSize:12,color:'#c0392b'}}><span style={{display:'inline-block',width:2,height:9,background:'#c0392b'}}/>今日</span>
         <span style={{fontSize:11,color:'#8888a0',marginLeft:'auto'}}>クリックで展開</span>
       </div>
-      <div style={{display:'flex',maxHeight:'70vh'}}>
-        {/* 左: 名前列（固定・縦スクロールのみ） */}
+      {/* ★ヘッダー行: スクロール外に固定（利用者名 + 月名） */}
+      <div style={{display:'flex',borderBottom:'1px solid #d8d8d0'}}>
+        <div style={{flexShrink:0,height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderRight:'2px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap'}}>利用者名</div>
+        <div ref={headerScrollRef} style={{flex:1,overflowX:'hidden',overflowY:'hidden'}}>
+          <div style={{display:'flex',height:HEADER_H,width:chartW,minWidth:chartW}}>
+            {months.map((m,i)=>{
+              const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
+              const isJan=m.getMonth()===0;const isFirst=i===0;
+              return<div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'flex-end',justifyContent:'center',paddingBottom:4,fontSize:10,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',borderRight:'1px solid #eceae3',borderLeft:isJan&&!isFirst?'2px solid #c8c8c0':'none',position:'relative',boxSizing:'border-box'}}>
+                {(isJan||isFirst)&&<div style={{position:'absolute',top:2,left:isFirst?2:4,fontSize:9,fontWeight:700,color:'#2d5a7b'}}>{m.getFullYear()}</div>}
+                {m.getMonth()+1}月
+              </div>;
+            })}
+          </div>
+        </div>
+      </div>
+      {/* ★データ行: 2カラム（名前列固定 + チャート横スクロール）、縦スクロールのみ */}
+      <div style={{display:'flex',maxHeight:'65vh'}}>
+        {/* 左: 名前列 */}
         <div ref={nameScrollRef} onScroll={handleNameScroll} style={{flexShrink:0,overflowY:'auto',overflowX:'hidden',borderRight:'2px solid #d8d8d0',scrollbarWidth:'none',msOverflowStyle:'none'}}>
           <style>{`.gantt-name-col::-webkit-scrollbar{display:none}`}</style>
           <div className="gantt-name-col">
-            {/* ★利用者名ヘッダー: sticky固定 */}
-            <div style={{height:HEADER_H,display:'flex',alignItems:'flex-end',padding:'0 8px 4px',fontSize:11,fontWeight:600,color:'#2d5a7b',background:'#fafaf8',borderBottom:'1px solid #d8d8d0',boxSizing:'border-box',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:2}}>利用者名</div>
             {ganttClients.map((client,ci)=>{
               const isExp=!!expandedGantt[client.id];
               const ws=getWorstStatus(client);const wc=ws?STATUS_CONFIG[ws].color:'#8888a0';
@@ -171,19 +194,9 @@ function GanttChart({clients,onEditClient}){
             })}
           </div>
         </div>
-        {/* 右: チャート部分（横＋縦スクロール） */}
+        {/* 右: チャート部分 */}
         <div ref={chartScrollRef} onScroll={handleChartScroll} style={{flex:1,overflow:'auto'}}>
           <div style={{width:chartW,minWidth:chartW}}>
-            <div style={{display:'flex',height:HEADER_H,borderBottom:'1px solid #d8d8d0',position:'sticky',top:0,zIndex:2,background:'#fff'}}>
-              {months.map((m,i)=>{
-                const cur=m.getFullYear()===today.getFullYear()&&m.getMonth()===today.getMonth();
-                const isJan=m.getMonth()===0;const isFirst=i===0;
-                return<div key={i} style={{width:MON_W,flexShrink:0,display:'flex',alignItems:'flex-end',justifyContent:'center',paddingBottom:4,fontSize:10,fontWeight:cur?700:400,color:cur?'#2d5a7b':'#8888a0',background:cur?'#e8f0f5':'#fff',borderRight:'1px solid #eceae3',borderLeft:isJan&&!isFirst?'2px solid #c8c8c0':'none',position:'relative',boxSizing:'border-box'}}>
-                  {(isJan||isFirst)&&<div style={{position:'absolute',top:2,left:isFirst?2:4,fontSize:9,fontWeight:700,color:'#2d5a7b'}}>{m.getFullYear()}</div>}
-                  {m.getMonth()+1}月
-                </div>;
-              })}
-            </div>
             {ganttClients.map((client,ci)=>{
               const isExp=!!expandedGantt[client.id];
               const rows=[];
